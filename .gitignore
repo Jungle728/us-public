@@ -1,0 +1,16 @@
+# Secrets and generated runtime configs
+xray-config.json
+sing-box-config.json
+config.before-warp.json
+wgcf-account.toml
+wgcf-profile.conf
+mihomo-subscription.yaml
+clash-compatible-trojan.yaml
+client-links.txt
+shadowrocket-links.txt
+test-*.json
+
+# Local/system artifacts
+*.log
+*.tmp
+*.bak
