@@ -1,34 +1,41 @@
-# proxy.bigpandas.top VPN Setup
+# proxy.bigpandas.top Proxy Runbook
 
-This repository documents the VPN/proxy setup deployed on the VPS for
-`proxy.bigpandas.top`.
+This repository is the public runbook and bootstrap script collection for the
+proxy stack deployed at `proxy.bigpandas.top`.
 
-The server supports multiple client protocols, uses TLS certificates from Let's
-Encrypt, and serves a Mihomo subscription with rule-based routing.
+The live VPS contains generated configs, certificates, subscription tokens, and
+node credentials. Those runtime secrets are intentionally not committed here.
 
-## Overview
+## Current Architecture
 
-Domain:
-
-```text
-proxy.bigpandas.top
-```
-
-Server IP:
+The production deployment is Docker based and runs from:
 
 ```text
-Set by the current VPS provider.
+/opt/proxy-subscription
 ```
 
 Runtime components:
 
 ```text
-Docker Compose  Runtime supervisor
-Nginx container HTTP challenge, fallback web service, subscription hosting
-Xray container  VLESS Vision and Trojan
-sing-box        Hysteria2 and AnyTLS
-Certbot         Let's Encrypt certificate issuance and renewal
+Nginx container     ACME challenge handling, fallback HTTP response, subscription files
+Xray container      VLESS Vision on TCP 443, Trojan on TCP 8443
+sing-box container  Hysteria2 on UDP 443, AnyTLS on TCP 9443
+Certbot             Let's Encrypt issuance and renewal
+Docker Compose      Process supervision for the proxy stack
 ```
+
+Public ports that must be open in the VPS provider firewall or security group:
+
+```text
+TCP 80
+TCP 443
+TCP 8443
+TCP 9443
+UDP 443
+```
+
+The host `ufw` firewall is currently expected to be inactive. If a firewall is
+enabled later, mirror the same allowlist above.
 
 ## Protocols
 
@@ -39,140 +46,189 @@ Hysteria2       UDP 443     sing-box
 AnyTLS          TCP 9443    sing-box
 ```
 
-The host firewall `ufw` is currently inactive. If the VPS provider has a cloud
-firewall or security group, these ports must be allowed:
+Client compatibility varies by app and core version. Mihomo/Clash Verge handles
+the Clash subscription. Shadowrocket/manual links are generated separately.
+
+## Subscriptions
+
+The normal Mihomo/Clash subscription is served from:
 
 ```text
-TCP 80
-TCP 443
-TCP 8443
-TCP 9443
-UDP 443
+https://proxy.bigpandas.top/sub/<token>/config.yaml
 ```
 
-## Client Routing And DNS
-
-The generated Mihomo subscription follows this policy:
+The manual link file is served from:
 
 ```text
-Private and China domains/IPs -> DIRECT
-Non-China domains             -> US-VPS
-Fallback traffic              -> US-VPS
+https://proxy.bigpandas.top/sub/<token>/shadowrocket-links.txt
 ```
 
-DNS is configured to avoid local ISP/system DNS:
+Optional chained subscriptions can be published under a separate tokenized path:
 
 ```text
-Regular DNS queries          -> encrypted DoH through DNS-US proxy group
-Proxy server bootstrap DNS   -> encrypted Cloudflare/Google/Quad9 DoH
-System/local DNS             -> not used by the generated subscription
+https://proxy.bigpandas.top/sub/<chain-token>/config.yaml
 ```
+
+The chained subscription keeps the original VPS nodes and adds provider-backed
+groups for an airport relay path:
+
+```text
+Client -> airport node -> US VPS -> destination
+```
+
+Expected chain-related groups:
+
+```text
+US-VPS
+AIRPORT -> US-VPS
+CHAIN-AUTO
+AIRPORT
+AIRPORT-AUTO
+```
+
+Select `US-VPS = AIRPORT -> US-VPS` to use the chained path. Then tune the
+`AIRPORT` group manually if the automatic airport choice is not the best route.
+
+Do not publish real subscription tokens in this repository. If a token or node
+credential is exposed, rotate it before trusting the deployment again.
+
+## Client DNS And Routing
+
+The generated Mihomo config is designed for Windows and macOS clients using
+Clash Verge or another Mihomo-compatible app.
+
+Routing policy:
+
+```text
+Private networks and China domains/IPs -> DIRECT
+Non-China domains                      -> US-VPS
+Fallback traffic                       -> US-VPS
+```
+
+DNS policy:
+
+```text
+DNS override       Enabled on the client profile
+Enhanced mode      fake-ip
+IPv6               Disabled
+Local/system DNS   Avoided for proxy routing
+```
+
+DNS override is important on Windows. Without it, the system resolver may return
+polluted, unreachable, or IPv6-preferred answers before Mihomo can apply rules.
+That can make every node appear to time out even when the subscription imports
+correctly.
+
+IPv6 is disabled in the generated client profile because partial IPv6 support is
+often worse than no IPv6 support: Windows may prefer AAAA records, while the
+local network, TUN stack, selected node, or destination route may not be usable
+over IPv6.
 
 ## Important Paths
 
-Docker deployment paths:
+VPS runtime paths:
 
 ```text
 /opt/proxy-subscription/docker-compose.yml
+/opt/proxy-subscription/nginx/default.conf
 /opt/proxy-subscription/xray/config.json
 /opt/proxy-subscription/sing-box/config.json
-/opt/proxy-subscription/nginx/default.conf
 /opt/proxy-subscription/certs/
 /opt/proxy-subscription/www/sub/<token>/config.yaml
 /root/proxy-subscription-secrets.env
 /etc/letsencrypt/renewal-hooks/deploy/proxy-subscription-docker
 ```
 
-Workspace files:
+Repository files:
 
 ```text
-nginx-vpn.conf                Nginx site config
-deploy-xray-cert.sh           Legacy bare-metal Certbot deploy hook
-bootstrap-proxy-subscription.sh
-bootstrap-docker-proxy-subscription.sh
+bootstrap-docker-proxy-subscription.sh  Current Docker deployment script
+bootstrap-proxy-subscription.sh         Legacy bare-metal deployment script
+deploy-xray-cert.sh                     Legacy bare-metal Certbot hook
+nginx-vpn.conf                          Legacy Nginx site config
+README.md                               Public runbook
 ```
 
-## Docker Deployment
+## Deployment
 
-Run as root on the VPS:
+Run the Docker bootstrap on the VPS as root:
 
 ```bash
 sudo /root/code/us-public/bootstrap-docker-proxy-subscription.sh
 ```
 
-The Docker migration script reuses credentials from
-`/root/proxy-subscription-secrets.env`, builds local Xray and sing-box images
-from the installed static binaries, writes the Compose stack under
-`/opt/proxy-subscription`, disables the host `xray`, `sing-box`, and `nginx`
-services, starts containers, and verifies the subscription URL.
-
-The older `bootstrap-proxy-subscription.sh` script is kept as a legacy
-bare-metal bootstrap and should not be needed for normal operation.
-
-## Subscription
-
-The live Mihomo/Clash subscription is served by Nginx from:
+The script:
 
 ```text
-https://proxy.bigpandas.top/sub/<token>/config.yaml
+Reuses credentials from /root/proxy-subscription-secrets.env
+Builds local Xray and sing-box images from installed static binaries
+Writes the Compose stack under /opt/proxy-subscription
+Publishes subscription files under /opt/proxy-subscription/www
+Installs the Docker certificate deploy hook
+Disables host xray, sing-box, and nginx services
+Starts and verifies the containerized stack
 ```
 
-The Shadowrocket/manual link file is served from:
-
-```text
-https://proxy.bigpandas.top/sub/<token>/shadowrocket-links.txt
-```
-
-Do not commit the real token or published subscription contents to a public
-repository unless all node credentials have been rotated.
+The older `bootstrap-proxy-subscription.sh` script is kept for legacy
+bare-metal installs and should not be used for the normal Docker deployment.
 
 ## Certificate Renewal
 
-Certbot issues a Let's Encrypt certificate for `proxy.bigpandas.top`.
+Certbot renews the Let's Encrypt certificate for `proxy.bigpandas.top`.
 
-The Docker deploy hook:
+Docker renewal hook:
 
 ```text
 /etc/letsencrypt/renewal-hooks/deploy/proxy-subscription-docker
 ```
 
-copies renewed certificates to `/opt/proxy-subscription/certs`, then restarts
-the Xray and sing-box containers.
+The hook copies renewed certificates into `/opt/proxy-subscription/certs`, then
+restarts the Xray and sing-box containers.
 
-Manual certificate deploy:
+Manual hook run:
 
 ```bash
 sudo /etc/letsencrypt/renewal-hooks/deploy/proxy-subscription-docker
 ```
 
-Check renewal timer:
+Check the renewal timer:
 
 ```bash
 systemctl list-timers certbot.timer --no-pager
 ```
 
-## Service Commands
+## Operations
 
-Check status:
+Check container status:
 
 ```bash
 docker compose -f /opt/proxy-subscription/docker-compose.yml ps
 ```
 
-Restart services:
+Follow logs:
+
+```bash
+docker compose -f /opt/proxy-subscription/docker-compose.yml logs -f
+```
+
+Restart the stack:
 
 ```bash
 docker compose -f /opt/proxy-subscription/docker-compose.yml restart
 ```
 
-Validate configs:
+Validate Xray:
 
 ```bash
 docker run --rm \
   -v /opt/proxy-subscription/xray/config.json:/etc/xray/config.json:ro \
   -v /opt/proxy-subscription/certs:/opt/proxy-subscription/certs:ro \
   proxy-subscription-xray:local run -test -config /etc/xray/config.json
+```
 
+Validate sing-box:
+
+```bash
 docker run --rm \
   -v /opt/proxy-subscription/sing-box/config.json:/etc/sing-box/config.json:ro \
   -v /opt/proxy-subscription/certs:/opt/proxy-subscription/certs:ro \
@@ -187,37 +243,52 @@ ss -tulpn
 
 ## Verification Checklist
 
-Run these checks after setup:
+After deployment or a major config change, verify:
 
 ```text
-DNS A record: proxy.bigpandas.top -> current VPS IP
-TLS handshake: TCP 443 and TCP 8443 verified
-Docker containers: proxy-xray, proxy-sing-box, proxy-nginx are Up
-Host services: xray, sing-box, nginx are disabled and inactive
-Hysteria2: client test passes
-AnyTLS: client test passes
-DNS leak test: resolver IPs are not local ISP resolvers
+DNS A record points proxy.bigpandas.top to the current VPS IP
+TLS handshakes pass on TCP 443 and TCP 8443
+proxy-xray, proxy-sing-box, and proxy-nginx containers are Up
+Host xray, sing-box, and nginx services are disabled/inactive
+The normal subscription URL imports in Clash Verge
+DNS override is enabled in Clash Verge
+IPv6 is disabled in the client profile
+VLESS Vision and Trojan pass connectivity tests
+Hysteria2 and AnyTLS are tested only with compatible clients
+DNS leak tests do not show local ISP resolvers
+```
+
+For Windows Clash Verge troubleshooting, first check:
+
+```text
+DNS override is enabled
+TUN mode is enabled when full-device routing is needed
+IPv6 is disabled
+The selected node is VLESS or Trojan before testing newer protocols
+The subscription URL can be refreshed inside the app
 ```
 
 ## Security Notes
 
-Runtime files on the VPS contain real production secrets:
+Runtime files on the VPS contain production secrets:
 
 ```text
-VPN UUIDs and passwords
-Published subscription token
+Node UUIDs and passwords
+Airport provider subscription URLs
+Published subscription tokens
 TLS-dependent client links
-Generated Docker configs under /opt/proxy-subscription
+Generated configs under /opt/proxy-subscription
 ```
 
 Before pushing to GitHub:
 
-1. Keep the current `.gitignore`.
-2. Do not force-add ignored config or credential files.
-3. If secrets were already committed, rotate all node passwords, UUIDs, and
-   subscription URL token.
-4. Prefer publishing sanitized template files such as `*.example.json` for
-   reusable documentation.
+```text
+Do not force-add ignored generated files
+Do not commit live config.yaml subscription files
+Do not commit /root/proxy-subscription-secrets.env
+Do not commit airport subscription tokens
+Rotate any credential that was exposed in chat, logs, commits, or screenshots
+```
 
 ## References
 
@@ -225,5 +296,4 @@ Before pushing to GitHub:
 - Xray install script: <https://github.com/XTLS/Xray-install>
 - sing-box Hysteria2 inbound: <https://sing-box.sagernet.org/configuration/inbound/hysteria2/>
 - sing-box AnyTLS inbound: <https://sing-box.sagernet.org/configuration/inbound/anytls/>
-- sing-box WireGuard endpoint: <https://sing-box.sagernet.org/configuration/endpoint/wireguard/>
 - Certbot: <https://certbot.eff.org/>

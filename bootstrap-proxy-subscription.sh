@@ -400,6 +400,17 @@ log-level: info
 external-controller: 127.0.0.1:9090
 unified-delay: true
 tcp-concurrent: true
+ipv6: false
+
+tun:
+  enable: true
+  stack: mixed
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
 
 geox-url:
   geoip: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat
@@ -408,22 +419,21 @@ geox-url:
 
 dns:
   enable: true
-  ipv6: true
+  listen: 0.0.0.0:1053
+  ipv6: false
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   use-hosts: true
   respect-rules: true
   default-nameserver:
     - https://1.1.1.1/dns-query
-    - https://8.8.8.8/dns-query
+    - https://1.0.0.1/dns-query
   proxy-server-nameserver:
     - https://1.1.1.1/dns-query
-    - https://8.8.8.8/dns-query
-    - https://9.9.9.9/dns-query
+    - https://1.0.0.1/dns-query
   nameserver:
     - https://1.1.1.1/dns-query#DNS-US
-    - https://8.8.8.8/dns-query#DNS-US
-    - https://9.9.9.9/dns-query#DNS-US
+    - https://1.0.0.1/dns-query#DNS-US
   fake-ip-filter:
     - '*.lan'
     - '*.localdomain'
@@ -568,6 +578,9 @@ rule-providers:
     url: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/cn.mrs
 
 rules:
+  - AND,((DST-PORT,53),(NETWORK,UDP)),REJECT
+  - AND,((DST-PORT,53),(NETWORK,TCP)),REJECT
+  - DST-PORT,853,REJECT
   - DOMAIN,api.ip.sb,REJECT
   - DOMAIN,ipapi.co,REJECT
   - DOMAIN,api.ipapi.is,REJECT
