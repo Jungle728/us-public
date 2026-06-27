@@ -9,6 +9,11 @@ clash-compatible-trojan.yaml
 client-links.txt
 shadowrocket-links.txt
 test-*.json
+proxy-subscription-secrets.env
+.env
+*.pem
+*.key
+docker-compose.override.yml
 
 # Local/system artifacts
 *.log

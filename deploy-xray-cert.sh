@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOMAIN="us.bigpandas.top"
+DOMAIN="${DOMAIN:-proxy.bigpandas.top}"
 SOURCE_DIR="/etc/letsencrypt/live/${DOMAIN}"
 TARGET_DIR="/usr/local/etc/xray/certs"
 SING_BOX_TARGET_DIR="/etc/sing-box/certs"

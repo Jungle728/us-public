@@ -1,34 +1,33 @@
-# us.bigpandas.top VPN Setup
+# proxy.bigpandas.top VPN Setup
 
 This repository documents the VPN/proxy setup deployed on the VPS for
-`us.bigpandas.top`.
+`proxy.bigpandas.top`.
 
-The server currently supports multiple client protocols, uses TLS certificates
-from Let's Encrypt, and applies server-side egress routing so AI services can use
-stable exits.
+The server supports multiple client protocols, uses TLS certificates from Let's
+Encrypt, and serves a Mihomo subscription with rule-based routing.
 
 ## Overview
 
 Domain:
 
 ```text
-us.bigpandas.top
+proxy.bigpandas.top
 ```
 
 Server IP:
 
 ```text
-154.44.3.210
+Set by the current VPS provider.
 ```
 
 Runtime components:
 
 ```text
-Nginx     HTTP challenge, fallback web service, subscription hosting
-Xray      VLESS Vision and Trojan
-sing-box  Hysteria2 and AnyTLS
-Certbot   Let's Encrypt certificate issuance and renewal
-WARP      Cloudflare WARP WireGuard endpoint for selected Google traffic
+Docker Compose  Runtime supervisor
+Nginx container HTTP challenge, fallback web service, subscription hosting
+Xray container  VLESS Vision and Trojan
+sing-box        Hysteria2 and AnyTLS
+Certbot         Let's Encrypt certificate issuance and renewal
 ```
 
 ## Protocols
@@ -51,62 +50,77 @@ TCP 9443
 UDP 443
 ```
 
-## Egress Policy
+## Client Routing And DNS
 
-The current routing goal is account-safety oriented:
+The generated Mihomo subscription follows this policy:
 
 ```text
-ChatGPT / OpenAI / Claude / Anthropic -> VPS native IP
-Gemini / Google / YouTube             -> Cloudflare WARP
-Everything else                       -> VPS native IP
+Private and China domains/IPs -> DIRECT
+Non-China domains             -> US-VPS
+Fallback traffic              -> US-VPS
 ```
 
-This keeps OpenAI and Anthropic on a stable, fixed server exit while using WARP
-only for Google/Gemini, where the native VPS IP previously showed region or risk
-issues.
+DNS is configured to avoid local ISP/system DNS:
+
+```text
+Regular DNS queries          -> encrypted DoH through DNS-US proxy group
+Proxy server bootstrap DNS   -> encrypted Cloudflare/Google/Quad9 DoH
+System/local DNS             -> not used by the generated subscription
+```
 
 ## Important Paths
 
-System paths:
+Docker deployment paths:
 
 ```text
-/usr/local/etc/xray/config.json
-/etc/sing-box/config.json
-/etc/nginx/sites-available/vpn
-/etc/letsencrypt/renewal-hooks/deploy/xray-cert
-/usr/local/etc/xray/certs/
-/etc/sing-box/certs/
-/var/www/html/sub/<token>/config.yaml
+/opt/proxy-subscription/docker-compose.yml
+/opt/proxy-subscription/xray/config.json
+/opt/proxy-subscription/sing-box/config.json
+/opt/proxy-subscription/nginx/default.conf
+/opt/proxy-subscription/certs/
+/opt/proxy-subscription/www/sub/<token>/config.yaml
+/root/proxy-subscription-secrets.env
+/etc/letsencrypt/renewal-hooks/deploy/proxy-subscription-docker
 ```
 
 Workspace files:
 
 ```text
-xray-config.json              Xray service config, contains credentials
-sing-box-config.json          sing-box service config, contains credentials
 nginx-vpn.conf                Nginx site config
-deploy-xray-cert.sh           Certbot deploy hook
-mihomo-subscription.yaml      Clash/Mihomo subscription, contains node secrets
-shadowrocket-links.txt        Shadowrocket/manual links, contains node secrets
-client-links.txt              Raw client links, contains node secrets
-wgcf-account.toml             WARP account credentials
-wgcf-profile.conf             WARP WireGuard credentials
-config.before-warp.json       Backup before WARP routing was added
-test-*.json                   Local protocol test configs, contain credentials
+deploy-xray-cert.sh           Legacy bare-metal Certbot deploy hook
+bootstrap-proxy-subscription.sh
+bootstrap-docker-proxy-subscription.sh
 ```
+
+## Docker Deployment
+
+Run as root on the VPS:
+
+```bash
+sudo /root/code/us-public/bootstrap-docker-proxy-subscription.sh
+```
+
+The Docker migration script reuses credentials from
+`/root/proxy-subscription-secrets.env`, builds local Xray and sing-box images
+from the installed static binaries, writes the Compose stack under
+`/opt/proxy-subscription`, disables the host `xray`, `sing-box`, and `nginx`
+services, starts containers, and verifies the subscription URL.
+
+The older `bootstrap-proxy-subscription.sh` script is kept as a legacy
+bare-metal bootstrap and should not be needed for normal operation.
 
 ## Subscription
 
 The live Mihomo/Clash subscription is served by Nginx from:
 
 ```text
-https://us.bigpandas.top/sub/<token>/config.yaml
+https://proxy.bigpandas.top/sub/<token>/config.yaml
 ```
 
 The Shadowrocket/manual link file is served from:
 
 ```text
-https://us.bigpandas.top/sub/<token>/shadowrocket-links.txt
+https://proxy.bigpandas.top/sub/<token>/shadowrocket-links.txt
 ```
 
 Do not commit the real token or published subscription contents to a public
@@ -114,21 +128,21 @@ repository unless all node credentials have been rotated.
 
 ## Certificate Renewal
 
-Certbot issued a Let's Encrypt certificate for `us.bigpandas.top`.
+Certbot issues a Let's Encrypt certificate for `proxy.bigpandas.top`.
 
-The deploy hook:
+The Docker deploy hook:
 
 ```text
-/etc/letsencrypt/renewal-hooks/deploy/xray-cert
+/etc/letsencrypt/renewal-hooks/deploy/proxy-subscription-docker
 ```
 
-copies renewed certificates to both Xray and sing-box certificate directories,
-then restarts both services.
+copies renewed certificates to `/opt/proxy-subscription/certs`, then restarts
+the Xray and sing-box containers.
 
 Manual certificate deploy:
 
 ```bash
-sudo /etc/letsencrypt/renewal-hooks/deploy/xray-cert
+sudo /etc/letsencrypt/renewal-hooks/deploy/proxy-subscription-docker
 ```
 
 Check renewal timer:
@@ -142,25 +156,27 @@ systemctl list-timers certbot.timer --no-pager
 Check status:
 
 ```bash
-systemctl status xray --no-pager
-systemctl status sing-box --no-pager
-systemctl status nginx --no-pager
+docker compose -f /opt/proxy-subscription/docker-compose.yml ps
 ```
 
 Restart services:
 
 ```bash
-systemctl restart xray
-systemctl restart sing-box
-systemctl restart nginx
+docker compose -f /opt/proxy-subscription/docker-compose.yml restart
 ```
 
 Validate configs:
 
 ```bash
-xray run -test -config /usr/local/etc/xray/config.json
-sing-box check -c /etc/sing-box/config.json
-nginx -t
+docker run --rm \
+  -v /opt/proxy-subscription/xray/config.json:/etc/xray/config.json:ro \
+  -v /opt/proxy-subscription/certs:/opt/proxy-subscription/certs:ro \
+  proxy-subscription-xray:local run -test -config /etc/xray/config.json
+
+docker run --rm \
+  -v /opt/proxy-subscription/sing-box/config.json:/etc/sing-box/config.json:ro \
+  -v /opt/proxy-subscription/certs:/opt/proxy-subscription/certs:ro \
+  proxy-subscription-sing-box:local check -c /etc/sing-box/config.json
 ```
 
 Check listening ports:
@@ -169,37 +185,37 @@ Check listening ports:
 ss -tulpn
 ```
 
-## Verification Performed
+## Verification Checklist
 
-The following checks were performed during setup:
+Run these checks after setup:
 
 ```text
-DNS A record: us.bigpandas.top -> 154.44.3.210
+DNS A record: proxy.bigpandas.top -> current VPS IP
 TLS handshake: TCP 443 and TCP 8443 verified
-Xray config: Configuration OK
-sing-box config: check passed
-Hysteria2: local client test passed
-AnyTLS: local client test passed
-WARP trace: warp=on, loc=US for Google/WARP-routed traffic
+Docker containers: proxy-xray, proxy-sing-box, proxy-nginx are Up
+Host services: xray, sing-box, nginx are disabled and inactive
+Hysteria2: client test passes
+AnyTLS: client test passes
+DNS leak test: resolver IPs are not local ISP resolvers
 ```
 
 ## Security Notes
 
-This workspace contains real production secrets:
+Runtime files on the VPS contain real production secrets:
 
 ```text
 VPN UUIDs and passwords
-WARP private key and account data
 Published subscription token
 TLS-dependent client links
+Generated Docker configs under /opt/proxy-subscription
 ```
 
 Before pushing to GitHub:
 
 1. Keep the current `.gitignore`.
 2. Do not force-add ignored config or credential files.
-3. If secrets were already committed, rotate all node passwords, UUIDs, WARP
-   credentials, and subscription URL token.
+3. If secrets were already committed, rotate all node passwords, UUIDs, and
+   subscription URL token.
 4. Prefer publishing sanitized template files such as `*.example.json` for
    reusable documentation.
 
