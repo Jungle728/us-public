@@ -17,7 +17,7 @@
 ```text
 Nginx 容器      ACME HTTP 验证、默认 HTTP 响应、订阅文件托管
 Xray 容器       VLESS Vision TCP 443、Trojan TCP 8443
-sing-box 容器   Hysteria2 UDP 443、AnyTLS TCP 9443
+sing-box 容器   Hysteria2 UDP 443/8443、AnyTLS TCP 9443
 Certbot         Let's Encrypt 证书签发和续期
 Docker Compose  代理服务编排和进程托管
 ```
@@ -30,6 +30,7 @@ TCP 443
 TCP 8443
 TCP 9443
 UDP 443
+UDP 8443
 ```
 
 当前预期主机上的 `ufw` 是关闭状态。如果之后启用主机防火墙，也需要同步放行上面的端口。
@@ -40,6 +41,7 @@ UDP 443
 VLESS Vision    TCP 443     Xray
 Trojan          TCP 8443    Xray
 Hysteria2       UDP 443     sing-box
+Hysteria2       UDP 8443    sing-box 备用端口
 AnyTLS          TCP 9443    sing-box
 ```
 
@@ -47,19 +49,31 @@ AnyTLS          TCP 9443    sing-box
 
 ## 订阅
 
-常规 Mihomo/Clash 订阅地址格式：
+当前主 Mihomo/Clash 订阅格式：
 
 ```text
-https://proxy.bigpandas.top/sub/<token>/config.yaml
+https://proxy.bigpandas.top/sub/<main-token>/config.yaml
 ```
 
-手动链接文件地址格式：
+这份订阅是当前日常使用版本，保留自建 VPS 节点，并借用机场订阅的规则思路：
 
 ```text
-https://proxy.bigpandas.top/sub/<token>/shadowrocket-links.txt
+私有/局域网          -> DIRECT
+中国大陆域名         -> DIRECT
+中国大陆 IP          -> DIRECT
+非中国大陆域名       -> US-VPS
+兜底流量             -> US-VPS
 ```
 
-可选的链式代理订阅会发布在独立 token 路径下：
+主订阅内置 DNS 配置，客户端不要再额外开启 DNS 覆写。
+
+手动链接文件地址：
+
+```text
+https://proxy.bigpandas.top/sub/<main-token>/shadowrocket-links.txt
+```
+
+可选的链式代理订阅：
 
 ```text
 https://proxy.bigpandas.top/sub/<chain-token>/config.yaml
@@ -70,6 +84,14 @@ https://proxy.bigpandas.top/sub/<chain-token>/config.yaml
 ```text
 客户端 -> 机场节点 -> 美国 VPS -> 目标网站
 ```
+
+已经删除的旧订阅：
+
+```text
+https://proxy.bigpandas.top/sub/<removed-clean-check-token>/config.yaml
+```
+
+这个旧订阅是“所有公网流量都强制走 VPS”的纯净检测模式，现在不再使用，避免下一台机器误导入。
 
 链式代理相关分组：
 
@@ -89,7 +111,7 @@ US-VPS = AIRPORT -> US-VPS
 
 如果自动选择的机场节点效果不好，再到 `AIRPORT` 分组里手动切换香港、日本、新加坡、美国等节点测试。
 
-不要把真实订阅 token 提交到仓库。如果订阅 token、机场链接或节点凭据已经暴露，需要先轮换凭据，再继续使用。
+真实 token 在运行时目录中查询，公开 README 只记录订阅格式和规则口径。不要把机场订阅 token、节点 UUID、节点密码或完整生成配置提交到仓库。如果凭据已经暴露，需要先轮换凭据，再继续使用。
 
 ## 客户端 DNS 和路由
 
@@ -106,15 +128,35 @@ US-VPS = AIRPORT -> US-VPS
 DNS 策略：
 
 ```text
-DNS 覆写       开启
-增强模式       fake-ip
-IPv6           关闭
-本地/系统 DNS  尽量不参与代理路由解析
+Clash Verge DNS 覆写  关闭
+订阅内置 DNS          开启
+增强模式              fake-ip
+IPv6                  关闭
+国外域名 DNS          Cloudflare DoH，经 US-VPS
+代理节点/直连 DNS      阿里 DNS / DNSPod DoH，用于启动和国内直连
 ```
 
-Windows 上尤其需要开启 DNS 覆写。否则系统 DNS 可能先返回被污染、不可达或优先 IPv6 的解析结果，导致订阅可以导入，但节点测速和访问全部 timeout。
+不要同时启用 Clash Verge 的 DNS 覆写。客户端覆写会覆盖订阅内置 DNS，容易重新混入 `system`、`114.114.114.114`、`223.5.5.5` 等解析器，导致 DNS 泄漏或解析链路混乱。
+
+如果关闭 DNS 覆写后出现全部 timeout，优先检查：
+
+```text
+rule-provider 是否下载成功
+proxy-server-nameserver 是否能直连解析代理节点域名
+US-VPS 分组是否选中可用节点
+TUN 是否启动成功
+```
 
 生成的客户端配置默认关闭 IPv6。很多网络环境里 IPv6 是“看起来可用，实际不稳”：Windows 可能优先使用 AAAA 记录，但本地网络、TUN、所选节点或目标路由并没有完整可用的 IPv6 链路。
+
+VPS 本机 DNS 当前使用 AT&T DNS：
+
+```text
+68.94.156.1
+68.94.157.1
+```
+
+这只影响 VPS 自己解析外部域名，不决定客户端能否连接 VLESS、Trojan、Hysteria2 或 AnyTLS。
 
 ## 重要路径
 
@@ -241,17 +283,18 @@ TCP 443 和 TCP 8443 的 TLS 握手正常
 proxy-xray、proxy-sing-box、proxy-nginx 容器处于 Up
 主机上的 xray、sing-box、nginx 服务已禁用或停止
 常规订阅可以在 Clash Verge 中导入
-Clash Verge 已开启 DNS 覆写
+Clash Verge 已关闭 DNS 覆写
 客户端配置中 IPv6 已关闭
 VLESS Vision 和 Trojan 连通性测试通过
-Hysteria2 和 AnyTLS 只在兼容客户端中测试
+Hysteria2 UDP 443 和 UDP 8443 至少一个可用
+AnyTLS 连通性测试通过
 DNS 泄漏测试不显示本地运营商解析器
 ```
 
 Windows Clash Verge 排查优先检查：
 
 ```text
-DNS 覆写是否开启
+DNS 覆写是否关闭
 需要全局设备路由时 TUN 是否开启
 IPv6 是否关闭
 先测试 VLESS 或 Trojan，再测试较新的协议
