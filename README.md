@@ -67,6 +67,16 @@ https://proxy.bigpandas.top/sub/<main-token>/config.yaml
 
 主订阅内置 DNS 配置，客户端不要再额外开启 DNS 覆写。
 
+主出口分组逻辑：
+
+```text
+US-VPS 默认优先选择 AUTO
+AUTO 使用 url-test，在 VLESS / Trojan / HY2-443 / HY2-8443 / AnyTLS 中选择最低延迟协议
+AUTO tolerance = 0，尽量贴近实时最低延迟
+HY2 独立分组只在两个 Hysteria2 端口之间测速选择
+FALLBACK 作为自动故障切换备用
+```
+
 手动链接文件地址：
 
 ```text

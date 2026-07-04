@@ -351,6 +351,28 @@ write_sing_box_config() {
       "masquerade": "http://127.0.0.1:8080"
     },
     {
+      "type": "hysteria2",
+      "tag": "hy2-udp-8443",
+      "listen": "::",
+      "listen_port": 8443,
+      "users": [
+        {
+          "name": "proxy",
+          "password": "${HY2_PASSWORD}"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "${DOMAIN}",
+        "alpn": [
+          "h3"
+        ],
+        "certificate_path": "${SING_BOX_CERT_DIR}/fullchain.pem",
+        "key_path": "${SING_BOX_CERT_DIR}/privkey.pem"
+      },
+      "masquerade": "http://127.0.0.1:8080"
+    },
+    {
       "type": "anytls",
       "tag": "anytls-9443",
       "listen": "::",
@@ -505,6 +527,16 @@ proxies:
       - h3
     skip-cert-verify: false
 
+  - name: US-VPS-Hysteria2-8443
+    type: hysteria2
+    server: ${DOMAIN}
+    port: 8443
+    password: ${HY2_PASSWORD}
+    sni: ${DOMAIN}
+    alpn:
+      - h3
+    skip-cert-verify: false
+
   - name: US-VPS-AnyTLS
     type: anytls
     server: ${DOMAIN}
@@ -518,25 +550,50 @@ proxy-groups:
     type: select
     proxies:
       - AUTO
+      - HY2
+      - FALLBACK
       - US-VPS-VLESS
       - US-VPS-Trojan
       - US-VPS-Hysteria2
+      - US-VPS-Hysteria2-8443
       - US-VPS-AnyTLS
+      - DIRECT
+  - name: HY2
+    type: url-test
+    proxies:
+      - US-VPS-Hysteria2
+      - US-VPS-Hysteria2-8443
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
   - name: AUTO
     type: url-test
     proxies:
       - US-VPS-VLESS
       - US-VPS-Trojan
       - US-VPS-Hysteria2
+      - US-VPS-Hysteria2-8443
       - US-VPS-AnyTLS
-    url: https://www.gstatic.com/generate_204
-    interval: 1800
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 0
+  - name: FALLBACK
+    type: fallback
+    proxies:
+      - US-VPS-VLESS
+      - US-VPS-Trojan
+      - US-VPS-Hysteria2
+      - US-VPS-Hysteria2-8443
+      - US-VPS-AnyTLS
+    url: http://www.gstatic.com/generate_204
+    interval: 300
   - name: DNS-US
     type: select
     proxies:
       - US-VPS-VLESS
       - US-VPS-Trojan
       - US-VPS-Hysteria2
+      - US-VPS-Hysteria2-8443
       - US-VPS-AnyTLS
 
 rule-anchor:
@@ -653,6 +710,7 @@ EOF
 vless://${XRAY_UUID}@${DOMAIN}:443?encryption=none&security=tls&sni=${DOMAIN}&type=tcp&flow=xtls-rprx-vision#proxy-vless-vision
 trojan://${TROJAN_PASSWORD}@${DOMAIN}:8443?security=tls&sni=${DOMAIN}&type=tcp#proxy-trojan
 hysteria2://${HY2_PASSWORD}@${DOMAIN}:443?sni=${DOMAIN}&alpn=h3&insecure=0#proxy-hysteria2
+hysteria2://${HY2_PASSWORD}@${DOMAIN}:8443?sni=${DOMAIN}&alpn=h3&insecure=0#proxy-hysteria2-8443
 anytls://${ANYTLS_PASSWORD}@${DOMAIN}:9443?security=tls&sni=${DOMAIN}&insecure=0#proxy-anytls
 EOF
 
@@ -693,6 +751,20 @@ EOF
       "tag": "proxy-hysteria2",
       "server": "${DOMAIN}",
       "server_port": 443,
+      "password": "${HY2_PASSWORD}",
+      "tls": {
+        "enabled": true,
+        "server_name": "${DOMAIN}",
+        "alpn": [
+          "h3"
+        ]
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "proxy-hysteria2-8443",
+      "server": "${DOMAIN}",
+      "server_port": 8443,
       "password": "${HY2_PASSWORD}",
       "tls": {
         "enabled": true,
