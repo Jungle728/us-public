@@ -159,14 +159,15 @@ TUN 是否启动成功
 
 生成的客户端配置默认关闭 IPv6。很多网络环境里 IPv6 是“看起来可用，实际不稳”：Windows 可能优先使用 AAAA 记录，但本地网络、TUN、所选节点或目标路由并没有完整可用的 IPv6 链路。
 
-VPS 本机 DNS 当前使用 AT&T DNS：
+VPS 本机 DNS 建议使用稳定公共 DNS：
 
 ```text
-68.94.156.1
-68.94.157.1
+1.1.1.1
+8.8.8.8
+options timeout:2 attempts:2 rotate
 ```
 
-这只影响 VPS 自己解析外部域名，不决定客户端能否连接 VLESS、Trojan、Hysteria2 或 AnyTLS。
+AT&T DNS 曾出现 `archive.ubuntu.com` 解析失败，导致 `apt update` / `apt install` 无法正常使用；不建议作为 VPS 系统默认 DNS。这个配置只影响 VPS 自己解析外部域名，不决定客户端能否连接 VLESS、Trojan、Hysteria2 或 AnyTLS，也不替代 Mihomo 订阅内置的防泄漏 DNS。
 
 ## 重要路径
 
