@@ -19,3 +19,14 @@ docker-compose.override.yml
 *.log
 *.tmp
 *.bak
+
+# 3X-UI runtime data and credentials
+3x-ui/data/
+3x-ui/logs/
+3x-ui/letsencrypt/
+3x-ui/certbot-lib/
+3x-ui/certbot-logs/
+3x-ui/certbot-www/
+3x-ui/*.env
+3x-ui/www/*
+!3x-ui/www/.gitkeep
