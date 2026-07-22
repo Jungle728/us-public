@@ -1,0 +1,12 @@
+[Unit]
+Description=Run YunTu pure-exit sync every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Persistent=true
+Unit=yuntu-exit-sync.service
+
+[Install]
+WantedBy=timers.target

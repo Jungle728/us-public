@@ -1,0 +1,86 @@
+services:
+  nginx:
+    image: nginx:1.30.3-alpine@sha256:0d3b80406a13a767339fbe2f41406d6c7da727ab89cf8fae399e81f780f814d1
+    container_name: s-ui-edge-nginx
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        cert=/etc/letsencrypt/live/s-ui-domains/fullchain.pem
+        last_mtime=$$(stat -Lc %Y "$$cert")
+        (
+          while sleep 300; do
+            current_mtime=$$(stat -Lc %Y "$$cert" 2>/dev/null || echo 0)
+            if [ "$$current_mtime" != "$$last_mtime" ]; then
+              nginx -t
+              nginx -s reload
+              last_mtime="$$current_mtime"
+            fi
+          done
+        ) &
+        exec nginx -g 'daemon off;'
+    read_only: true
+    tmpfs:
+      - /run:rw,noexec,nosuid,size=16m
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./letsencrypt:/etc/letsencrypt:ro
+      - ./certbot-www:/var/www/certbot:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+      - CHOWN
+    pids_limit: 128
+    mem_limit: 128m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t && nc -z 127.0.0.1 443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  certbot:
+    image: certbot/certbot:v5.7.0@sha256:6bb19cff0b3972a69855686e0ccbd20b98dbfae2aa43845a5df48947ba1401b4
+    container_name: s-ui-edge-certbot
+    network_mode: host
+    restart: unless-stopped
+    entrypoint: /bin/sh
+    command:
+      - -ec
+      - |
+        trap exit TERM INT
+        while :; do
+          certbot renew --non-interactive --webroot --webroot-path /var/www/certbot
+          sleep 12h & wait $$!
+        done
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt
+      - ./certbot-www:/var/www/certbot
+      - ./certbot-lib:/var/lib/letsencrypt
+      - ./certbot-logs:/var/log/letsencrypt
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"

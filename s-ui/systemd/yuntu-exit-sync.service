@@ -1,0 +1,10 @@
+[Unit]
+Description=Sync AaITR s-ui production users to YunTu pure-exit sing-box
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/code/us-public/s-ui
+ExecStart=/usr/bin/python3 /root/code/us-public/s-ui/sync_yuntu_exit.py
+Nice=5

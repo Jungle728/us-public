@@ -1,32 +1,59 @@
-# Secrets and generated runtime configs
-xray-config.json
-sing-box-config.json
-config.before-warp.json
-wgcf-account.toml
-wgcf-profile.conf
-mihomo-subscription.yaml
-clash-compatible-trojan.yaml
+# 敏感信息与运行时数据
+.env
+*.env
+*.key
+*.pem
+*.crt
+*.csr
+*.p12
+*.pfx
+*password*
+*secret*
+*token*
 client-links.txt
 shadowrocket-links.txt
-test-*.json
 proxy-subscription-secrets.env
-.env
-*.pem
-*.key
-docker-compose.override.yml
 
-# Local/system artifacts
-*.log
-*.tmp
-*.bak
+# 数据库、证书、备份、日志
+s-ui/.admin-password
+s-ui/db/
+s-ui/s-ui.db
+s-ui/backups/
+s-ui/yuntu-exit/
+s-ui/*.before-*
+s-ui-edge/letsencrypt/
+s-ui-edge/certbot-www/
+s-ui-edge/certbot-lib/
+s-ui-edge/certbot-logs/
+s-ui-edge/backups/
+s-ui-edge/*.before-*
+yuntu-line/yuntu-exit/
+yuntu-line/backups/
 
-# 3X-UI runtime data and credentials
+# 旧 3x-ui 运行数据
 3x-ui/data/
 3x-ui/logs/
 3x-ui/letsencrypt/
 3x-ui/certbot-lib/
 3x-ui/certbot-logs/
 3x-ui/certbot-www/
-3x-ui/*.env
 3x-ui/www/*
 !3x-ui/www/.gitkeep
+
+# 本地与构建产物
+__pycache__/
+*.py[cod]
+*.log
+*.tmp
+*.bak
+.DS_Store
+outputs/
+repo_merge_*.md
+workspace-activation/
+notes.md
+deliverable.md
+task_plan.md
+**/notes.md
+**/deliverable.md
+**/task_plan.md
+docker-compose.override.yml

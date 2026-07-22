@@ -1,0 +1,33 @@
+services:
+  s-ui:
+    image: ghcr.io/alireza0/s-ui:v1.5.4@sha256:aa25d0018b210d71f40f3754e32dacfb98c49aa1cc9649ca93d20872fd942472
+    container_name: s-ui
+    hostname: s-ui
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    environment:
+      SUI_LOG_LEVEL: warn
+    volumes:
+      - ./db:/app/db
+      - ../s-ui-edge/letsencrypt:/app/cert:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    mem_limit: 384m
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3095/app/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+    stop_grace_period: 30s

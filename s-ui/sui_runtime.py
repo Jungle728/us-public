@@ -1,0 +1,389 @@
+#!/usr/bin/env python3
+"""Runtime API and verification helpers for the production s-ui stack."""
+
+from __future__ import annotations
+
+import base64
+import json
+import secrets
+import subprocess
+import urllib.parse
+import urllib.request
+from http.cookiejar import CookieJar
+from pathlib import Path
+
+
+ADMIN_PASSWORD = Path(__file__).resolve().with_name(".admin-password")
+SUI_BASE = "http://127.0.0.1:3095/app"
+SUI_SUB = "http://127.0.0.1:3096"
+TLS_SNI = "yuntu.bigpandas.top"
+AAITR_IPV4 = "99.88.84.197"
+CLASH_TEMPLATE = Path(__file__).resolve().with_name("clash-template.yaml")
+DISPLAY_NAMES = {
+    "yuntu-aaitr-reality",
+    "aaitr-exit-reality",
+    "yuntu-aaitr-hy2",
+    "aaitr-exit-hy2",
+    "yuntu-aaitr-anytls",
+    "aaitr-exit-anytls",
+    "yuntu-exit-reality",
+    "yuntu-exit-hy2",
+    "yuntu-exit-anytls",
+}
+
+
+def fail(message: str) -> None:
+    raise RuntimeError(message)
+
+
+class SUI:
+    def __init__(self) -> None:
+        self.jar = CookieJar()
+        self.opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(self.jar)
+        )
+
+    def request(self, method: str, url: str, data: dict | None = None) -> dict:
+        body = None
+        headers = {"Host": "sub.bigpandas.top"}
+        if data is not None:
+            body = urllib.parse.urlencode(data).encode()
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        request = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with self.opener.open(request, timeout=15) as response:
+                payload = json.loads(response.read().decode())
+        except Exception as exc:  # noqa: BLE001
+            fail(f"s-ui API request failed: {method} {url}: {type(exc).__name__}")
+        if not payload.get("success", False):
+            fail(f"s-ui API rejected {method} {url}: {payload.get('msg', 'unknown error')}")
+        return payload
+
+    def login(self) -> None:
+        if not ADMIN_PASSWORD.exists():
+            fail("admin password file is missing")
+        self.request(
+            "POST",
+            f"{SUI_BASE}/api/login",
+            {"user": "suiadmin", "pass": ADMIN_PASSWORD.read_text().strip()},
+        )
+
+    def get(self, object_name: str, query: dict | None = None):
+        url = f"{SUI_BASE}/api/{object_name}"
+        if query:
+            url += "?" + urllib.parse.urlencode(query)
+        obj = self.request("GET", url).get("obj")
+        if isinstance(obj, dict) and object_name in obj:
+            return obj[object_name]
+        return obj
+
+    def save(
+        self,
+        object_name: str,
+        data: dict,
+        init_users: str = "",
+        action: str = "new",
+    ):
+        return self.save_raw(
+            object_name,
+            json.dumps(data, separators=(",", ":")),
+            init_users=init_users,
+            action=action,
+        )
+
+    def save_raw(
+        self,
+        object_name: str,
+        data: str,
+        init_users: str = "",
+        action: str = "new",
+    ):
+        form = {"object": object_name, "action": action, "data": data}
+        if init_users:
+            form["initUsers"] = init_users
+        return self.request("POST", f"{SUI_BASE}/api/save", form).get("obj")
+
+    @staticmethod
+    def _object(payload: dict):
+        obj = payload.get("obj")
+        if isinstance(obj, str):
+            try:
+                return json.loads(obj)
+            except json.JSONDecodeError:
+                return obj
+        return obj
+
+    def link_convert(self, link: str) -> dict:
+        obj = self._object(
+            self.request("POST", f"{SUI_BASE}/api/linkConvert", {"link": link})
+        )
+        if isinstance(obj, list) and len(obj) == 1:
+            obj = obj[0]
+        if isinstance(obj, dict) and isinstance(obj.get("outbound"), dict):
+            obj = obj["outbound"]
+        if not isinstance(obj, dict) or not obj.get("type"):
+            fail("s-ui link conversion returned no outbound")
+        return obj
+
+    def check_outbound(self, tag: str) -> dict:
+        query = urllib.parse.urlencode(
+            {"tag": tag, "link": "https://api.ipify.org"}
+        )
+        payload = self.request("GET", f"{SUI_BASE}/api/checkOutbound?{query}")
+        obj = self._object(payload)
+        if not isinstance(obj, dict):
+            fail("s-ui outbound check returned no result")
+        ok = obj.get("OK")
+        if ok is None:
+            ok = obj.get("ok")
+        if ok is not True:
+            fail("s-ui outbound check reported a failed connection")
+        return obj
+
+    def delete_outbound(self, tag: str) -> None:
+        self.save_raw("outbounds", json.dumps(tag), action="del")
+
+
+def fetch_subscription(client_name: str, format_name: str = "") -> str:
+    path = f"{SUI_SUB}/sub/{urllib.parse.quote(client_name, safe='')}"
+    if format_name:
+        path += "?" + urllib.parse.urlencode({"format": format_name})
+    request = urllib.request.Request(path, headers={"Host": "sub.bigpandas.top"})
+    with urllib.request.urlopen(request, timeout=15) as response:
+        if response.status != 200:
+            fail(f"subscription returned HTTP {response.status}")
+        return response.read().decode()
+
+
+def subscription_links(client_name: str) -> dict[str, str]:
+    links = {}
+    for line in subscription_link_lines(client_name):
+        scheme = line.split("://", 1)[0].lower()
+        links.setdefault(scheme, line)
+    return links
+
+
+def subscription_link_lines(client_name: str) -> list[str]:
+    raw = fetch_subscription(client_name)
+    decoded = raw
+    if "://" not in decoded:
+        try:
+            decoded = base64.b64decode(raw + "=" * (-len(raw) % 4)).decode()
+        except Exception as exc:  # noqa: BLE001
+            fail(f"unable to decode raw subscription: {type(exc).__name__}")
+    links = []
+    for line in decoded.splitlines():
+        line = line.strip()
+        if "://" not in line:
+            continue
+        links.append(line)
+    return links
+
+
+def link_route_marker(link: str) -> str:
+    parsed = urllib.parse.urlsplit(link)
+    hostname = parsed.hostname
+    port = parsed.port
+    if hostname == "proxy.bigpandas.top":
+        return "aaitr-exit"
+    if hostname == "yuntu.bigpandas.top" and port in {1443, 2443, 9443}:
+        return "yuntu-exit"
+    if hostname == "yuntu.bigpandas.top":
+        return "yuntu-aaitr"
+    fail(f"unexpected desktop link hostname: {hostname}")
+
+
+def link_display_name(link: str) -> str:
+    return urllib.parse.unquote(urllib.parse.urlsplit(link).fragment)
+
+
+def clash_template_rules() -> list[str]:
+    rules = []
+    in_rules = False
+    for line in CLASH_TEMPLATE.read_text().splitlines():
+        if line == "rules:":
+            in_rules = True
+            continue
+        if in_rules and line.startswith("  - "):
+            rules.append(line.removeprefix("  - "))
+    if not rules:
+        fail("the production Clash template contains no rules")
+    return rules
+
+
+def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
+    if clash is None:
+        clash = fetch_subscription(client_name, "clash")
+    lines = clash.splitlines()
+    try:
+        start = lines.index("rules:") + 1
+    except ValueError:
+        fail("Clash subscription contains no rules section")
+    end = next(
+        (
+            index
+            for index in range(start, len(lines))
+            if lines[index]
+            and not lines[index][0].isspace()
+            and lines[index].endswith(":")
+        ),
+        len(lines),
+    )
+    actual = [
+        line.strip().removeprefix("- ")
+        for line in lines[start:end]
+        if line.lstrip().startswith("- ")
+    ]
+    expected = clash_template_rules()
+    if actual != expected:
+        fail("Clash subscription routing rules do not match the production policy")
+    required_sections = ("mode: rule", "dns:", "sniffer:", "tun:", "proxy-groups:")
+    missing = [section for section in required_sections if section not in lines]
+    if missing:
+        fail(f"Clash subscription is missing policy sections: {missing}")
+    required_groups = (
+        "EXIT-MODE",
+        "YUNTU-AAITR-AUTO",
+        "YUNTU-EXIT-AUTO",
+        "AAITR-EXIT-AUTO",
+    )
+    for group in required_groups:
+        if f"name: {group}" not in clash:
+            fail(f"Clash subscription is missing the {group} proxy group")
+
+
+def verify_subscriptions(source: dict) -> None:
+    expected = {"vless", "hysteria2", "anytls"}
+    for item in source["clients"]:
+        link_lines = subscription_link_lines(item["name"])
+        schemes = [line.split("://", 1)[0].lower() for line in link_lines]
+        missing = expected - set(schemes)
+        if missing:
+            fail(f"raw subscription is missing protocols: {sorted(missing)}")
+        if len(link_lines) != 9:
+            fail(f"raw subscription should contain 9 desktop links, found {len(link_lines)}")
+        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+            count = sum(link_route_marker(line) == marker for line in link_lines)
+            if count != 3:
+                fail(f"raw subscription should contain 3 {marker} links, found {count}")
+        display_names = {link_display_name(line) for line in link_lines}
+        if display_names != DISPLAY_NAMES:
+            fail(f"raw subscription display names are unexpected: {sorted(display_names)}")
+        forbidden = {"socks", "http", "https"}
+        leaked = forbidden.intersection(schemes)
+        if leaked:
+            fail(f"desktop subscription leaked forward-proxy protocols: {sorted(leaked)}")
+
+        json_sub = json.loads(fetch_subscription(item["name"], "json"))
+        outbounds = [
+            outbound
+            for outbound in json_sub.get("outbounds", [])
+            if isinstance(outbound, dict) and outbound.get("type") in expected
+        ]
+        outbound_types = {outbound.get("type") for outbound in outbounds}
+        missing = expected - outbound_types
+        if missing:
+            fail(f"JSON subscription is missing protocols: {sorted(missing)}")
+        if len(outbounds) != 9:
+            fail(f"JSON subscription should contain 9 desktop outbounds, found {len(outbounds)}")
+        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+            count = sum(marker in str(outbound.get("tag", "")) for outbound in outbounds)
+            if count != 3:
+                fail(f"JSON subscription should contain 3 {marker} outbounds, found {count}")
+
+        clash = fetch_subscription(item["name"], "clash")
+        for protocol in expected:
+            if f"type: {protocol}" not in clash:
+                fail(f"Clash subscription is missing protocol: {protocol}")
+        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+            if clash.count(marker) < 3:
+                fail(f"Clash subscription is missing {marker} nodes")
+        for protocol in ("socks5", "socks", "http"):
+            if f"type: {protocol}" in clash:
+                fail(f"Clash subscription leaked forward-proxy type: {protocol}")
+        verify_clash_policy(item["name"], clash)
+    print(f"verified subscriptions: {len(source['clients'])}")
+    print("raw/json/clash protocol coverage: complete")
+
+
+def verify_protocols(source: dict) -> None:
+    sui = SUI()
+    sui.login()
+    aliases = {
+        "vless": "vless",
+        "hysteria2": "hysteria2",
+        "hy2": "hysteria2",
+        "anytls": "anytls",
+    }
+    checks = []
+    for client in source["clients"]:
+        link_lines = subscription_link_lines(client["name"])
+        found = set()
+        for link in link_lines:
+            scheme = link.split("://", 1)[0].lower()
+            protocol = aliases.get(scheme)
+            if protocol is None:
+                continue
+            marker = link_route_marker(link)
+            checks.append((protocol, marker, link))
+            found.add((protocol, marker))
+        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+            missing = {
+                protocol
+                for protocol in ("vless", "hysteria2", "anytls")
+                if (protocol, marker) not in found
+            }
+            if missing:
+                fail(f"subscription is missing {marker} links: {sorted(missing)}")
+
+    verified = 0
+    for index, (protocol, marker, link) in enumerate(checks):
+        tag = f"verify-{protocol}-{index}-{secrets.token_hex(4)}"
+        outbound = sui.link_convert(link)
+        if outbound.get("type") != protocol:
+            fail(f"s-ui converted {protocol} into an unexpected outbound type")
+        outbound["tag"] = tag
+        try:
+            sui.save("outbounds", outbound)
+            result = sui.check_outbound(tag)
+            delay = result.get("Delay", result.get("delay", "unknown"))
+            verified += 1
+            print(f"verified {marker} {protocol} outbound for link {index + 1}: {delay} ms")
+        finally:
+            try:
+                sui.delete_outbound(tag)
+            except Exception as exc:  # noqa: BLE001
+                fail(f"unable to remove temporary outbound: {type(exc).__name__}")
+    expected = len(source["clients"]) * 9
+    if verified != expected:
+        fail(f"verified {verified} protocol outbounds, expected {expected}")
+    print("VLESS Reality, Hysteria2, and AnyTLS real outbound checks: complete")
+
+
+def verify_forward_proxies(source: dict) -> None:
+    credential = f"{source['proxy']['name']}:{source['proxy']['password']}"
+    checks = {
+        "socks5": [
+            "curl", "-4fsS", "--max-time", "20",
+            "--socks5-hostname", "127.0.0.1:31080",
+            "--proxy-user", credential, "https://api.ipify.org",
+        ],
+        "http": [
+            "curl", "-4fsS", "--max-time", "20",
+            "--proxy", "http://127.0.0.1:31081",
+            "--proxy-user", credential, "https://api.ipify.org",
+        ],
+        "https": [
+            "curl", "-4fsS", "--max-time", "20",
+            "--proxy", f"https://{TLS_SNI}:443",
+            "--proxy-user", credential, "https://api.ipify.org",
+        ],
+    }
+    for name, command in checks.items():
+        result = subprocess.run(command, capture_output=True, text=True, timeout=25)
+        if result.returncode != 0:
+            fail(f"{name} proxy test failed with curl exit {result.returncode}")
+        if result.stdout.strip() != AAITR_IPV4:
+            fail(f"{name} proxy egress did not match the AaITR IPv4 address")
+    print("verified forward proxies: SOCKS5, HTTP, HTTPS")
+    print("forward proxy egress: AaITR IPv4")
