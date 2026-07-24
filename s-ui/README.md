@@ -98,9 +98,14 @@ python3 ./export_yuntu_exit.py --output ./yuntu-exit/config.json
 线上由 systemd timer 自动执行：
 
 ```bash
+cd /root/code/us-public/s-ui
+python3 ./install_yuntu_exit_sync.py
+python3 ./install_yuntu_exit_sync.py --check
 systemctl status yuntu-exit-sync.timer --no-pager
 journalctl -u yuntu-exit-sync.service -n 50 --no-pager
 ```
+
+s-ui 会立即为新用户生成订阅；timer 负责在约一分钟内把 `aaitr-production` 用户的 Reality、Hysteria2 和 AnyTLS 认证同步到 YunTu exit。`yuntu-exit-sync-*` 是单次同步使用的临时工作目录，正常结束会自动删除，不是用户数据目录。
 
 同步流程：
 

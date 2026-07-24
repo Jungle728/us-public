@@ -68,10 +68,20 @@ rules:
 
 AaITR 是管理源。新增或修改生产用户后：
 
-1. s-ui 生成订阅中的三种链路节点。
-2. `yuntu-exit-sync.timer` 每分钟渲染 YunTu exit 配置。
+1. s-ui 立即生成订阅中的三种链路节点。
+2. `yuntu-exit-sync.timer` 每分钟轮询生产用户并渲染 YunTu exit 配置。
 3. 同步脚本通过 SSH 推送到 YunTu。
 4. YunTu 先用 sing-box 校验配置；只有配置 hash 变化时才重启 `yuntu-exit`。
+
+安装或核对 timer：
+
+```bash
+cd /root/code/us-public/s-ui
+python3 ./install_yuntu_exit_sync.py
+python3 ./install_yuntu_exit_sync.py --check
+```
+
+`yuntu-exit-sync-*` 是同步过程创建并自动清理的临时工作目录，不保存长期用户数据。
 
 ## 安全边界
 
