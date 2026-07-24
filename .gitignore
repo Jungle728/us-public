@@ -20,6 +20,7 @@ s-ui/db/
 s-ui/s-ui.db
 s-ui/backups/
 s-ui/yuntu-exit/
+s-ui/yuntu-exit-sync-*/
 s-ui/*.before-*
 s-ui-edge/letsencrypt/
 s-ui-edge/certbot-www/
