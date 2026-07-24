@@ -211,6 +211,80 @@ def clash_template_rules() -> list[str]:
     return rules
 
 
+def clash_proxy_groups(clash: str) -> dict[str, dict[str, object]]:
+    """Parse the small proxy-group subset without depending on YAML packages."""
+    lines = clash.splitlines()
+    try:
+        start = lines.index("proxy-groups:") + 1
+    except ValueError:
+        fail("Clash subscription contains no proxy-groups section")
+    end = next(
+        (
+            index
+            for index in range(start, len(lines))
+            if lines[index]
+            and not lines[index][0].isspace()
+            and lines[index].endswith(":")
+        ),
+        len(lines),
+    )
+    section = lines[start:end]
+    item_indents = [
+        len(line) - len(line.lstrip())
+        for line in section
+        if line.lstrip().startswith("- ")
+    ]
+    if not item_indents:
+        fail("Clash subscription contains no proxy groups")
+    item_indent = min(item_indents)
+    blocks: list[list[str]] = []
+    current: list[str] = []
+    for line in section:
+        indent = len(line) - len(line.lstrip())
+        item_value = line.lstrip()[1:].strip()
+        starts_group = (
+            indent == item_indent
+            and line.lstrip().startswith("- ")
+            and ":" in item_value
+        )
+        if starts_group:
+            if current:
+                blocks.append(current)
+            current = [line]
+        elif current:
+            current.append(line)
+    if current:
+        blocks.append(current)
+
+    groups: dict[str, dict[str, object]] = {}
+    for block in blocks:
+        name = ""
+        group_type = ""
+        proxies: list[str] = []
+        in_proxies = False
+        for line in block:
+            indent = len(line) - len(line.lstrip())
+            value = line.strip()
+            dash_value = value[1:].strip() if value.startswith("-") else value
+            if (
+                in_proxies
+                and value.startswith("- ")
+                and (indent > item_indent or ":" not in dash_value)
+            ):
+                proxies.append(dash_value)
+                continue
+            if indent == item_indent and value.startswith("- "):
+                value = dash_value
+            in_proxies = value == "proxies:"
+            if value.startswith("name: "):
+                name = value.removeprefix("name: ")
+            elif value.startswith("type: "):
+                group_type = value.removeprefix("type: ")
+        if name:
+            groups[name] = {"type": group_type, "proxies": proxies}
+    return groups
+
+
 def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
     if clash is None:
         clash = fetch_subscription(client_name, "clash")
@@ -237,19 +311,59 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
     expected = clash_template_rules()
     if actual != expected:
         fail("Clash subscription routing rules do not match the production policy")
+    ai_rule = "GEOSITE,category-ai-!cn,EXIT-MODE"
+    cn_rule = "GEOSITE,cn,DIRECT"
+    if ai_rule not in actual or actual.index(ai_rule) > actual.index(cn_rule):
+        fail("the overseas AI rule must take precedence over the CN direct rule")
+    if actual[-2:] != ["MATCH,EXIT-MODE", "MATCH,REJECT"]:
+        fail("Clash subscription must fail closed after the EXIT-MODE catch-all")
+    if "geosite:category-ai-!cn:" not in clash:
+        fail("Clash subscription is missing the overseas AI DNS policy")
     required_sections = ("mode: rule", "dns:", "sniffer:", "tun:", "proxy-groups:")
     missing = [section for section in required_sections if section not in lines]
     if missing:
         fail(f"Clash subscription is missing policy sections: {missing}")
+    groups = clash_proxy_groups(clash)
     required_groups = (
         "EXIT-MODE",
+        "YUNTU-AAITR",
+        "YUNTU-EXIT",
+        "AAITR-EXIT",
         "YUNTU-AAITR-AUTO",
         "YUNTU-EXIT-AUTO",
         "AAITR-EXIT-AUTO",
     )
     for group in required_groups:
-        if f"name: {group}" not in clash:
+        if group not in groups:
             fail(f"Clash subscription is missing the {group} proxy group")
+    if groups["EXIT-MODE"] != {
+        "type": "select",
+        "proxies": ["YUNTU-AAITR", "YUNTU-EXIT", "AAITR-EXIT"],
+    }:
+        fail("Clash subscription has unexpected members in the EXIT-MODE group")
+    manual_groups = {
+        "YUNTU-AAITR": (
+            "YUNTU-AAITR-AUTO",
+            "yuntu-aaitr-reality",
+            "yuntu-aaitr-hy2",
+            "yuntu-aaitr-anytls",
+        ),
+        "YUNTU-EXIT": (
+            "YUNTU-EXIT-AUTO",
+            "yuntu-exit-reality",
+            "yuntu-exit-hy2",
+            "yuntu-exit-anytls",
+        ),
+        "AAITR-EXIT": (
+            "AAITR-EXIT-AUTO",
+            "aaitr-exit-reality",
+            "aaitr-exit-hy2",
+            "aaitr-exit-anytls",
+        ),
+    }
+    for group, members in manual_groups.items():
+        if groups[group] != {"type": "select", "proxies": list(members)}:
+            fail(f"Clash subscription has unexpected members in the {group} group")
 
 
 def verify_subscriptions(source: dict) -> None:

@@ -31,29 +31,34 @@ s-ui 容器使用 host network，因此公网暴露由 UFW 和 `s-ui-edge` 控�
 
 ```yaml
 rules:
+  - GEOSITE,category-ai-!cn,EXIT-MODE
   - DOMAIN-SUFFIX,browserleaks.com,EXIT-MODE
   - GEOSITE,private,DIRECT
   - GEOIP,private,DIRECT,no-resolve
   - GEOSITE,cn,DIRECT
   - GEOIP,cn,DIRECT,no-resolve
   - MATCH,EXIT-MODE
+  - MATCH,REJECT
 ```
 
 说明：
 
 - 私有地址和中国域名/IP 走 `DIRECT`。
 - 其他全部走 `EXIT-MODE`。
+- 海外 AI 域名优先走 `EXIT-MODE`，并通过海外 DoH 解析，避免与 `geosite:cn` 重叠时误走直连。
 - `browserleaks.com` 被显式放入 `EXIT-MODE`，用于修正上游 geosite 数据库误分类。
+- 最后的 `MATCH,REJECT` 是 fail-closed 保护：只有所选出口不支持当前流量、导致前一个 `MATCH,EXIT-MODE` 被 Mihomo 跳过时才会命中，防止内核隐式回落到 `DIRECT`。
+- Clash 订阅入口会为 Reality / Hysteria2 / AnyTLS 明确写入 UDP 能力；Reality 同时使用 `xudp` 封装，保证浏览器 QUIC 也服从 `EXIT-MODE`。
 
-`EXIT-MODE` 下有三个模式：
+`EXIT-MODE` 下有三个手动模式组：
 
 | 分组 | 链路 |
 |---|---|
-| `YUNTU-AAITR-AUTO` | 客户端 -> YunTu -> AaITR -> 目标网站 |
-| `YUNTU-EXIT-AUTO` | 客户端 -> YunTu -> 目标网站 |
-| `AAITR-EXIT-AUTO` | 客户端 -> AaITR -> 目标网站 |
+| `YUNTU-AAITR` | 客户端 -> YunTu -> AaITR -> 目标网站 |
+| `YUNTU-EXIT` | 客户端 -> YunTu -> 目标网站 |
+| `AAITR-EXIT` | 客户端 -> AaITR -> 目标网站 |
 
-每组通过 URLTest 在 Reality / Hysteria2 / AnyTLS 三个协议中自动选择延迟最低的节点。
+每个手动模式组默认选择对应的 `*-AUTO` URLTest，也允许固定 Reality、Hysteria2 或 AnyTLS。AUTO 仍会在同一条出口链路的三个协议中选择延迟最低的节点，不会跨模式改变出口。
 
 应用模板：
 

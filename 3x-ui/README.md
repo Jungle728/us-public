@@ -13,7 +13,7 @@
 ```text
 docker-compose.yml          容器编排
 nginx/nginx.conf            443 SNI、面板和订阅反向代理
-mihomo-template.yaml        Clash Verge/Mihomo 的 TUN、DNS 和路由模板
+mihomo-template.yaml        Clash Verge/Mihomo 的 TUN、防泄漏 DNS 和国内外分流模板
 apply-mihomo-template.sh    将模板写入 3X-UI SQLite
 init-certificates.sh        使用 Certbot 容器首次签发证书
 backup.sh                   停止容器后创建可迁移归档
@@ -55,7 +55,7 @@ docker compose ps
 ./apply-mihomo-template.sh
 ```
 
-脚本会备份 SQLite、开启 3X-UI 的 Clash 自定义路由、写入完整 Mihomo 模板并等待容器恢复健康。
+脚本会重新绑定最新模板文件、备份 SQLite、开启 3X-UI 的 Clash 自定义路由、写入完整 Mihomo 模板并等待容器恢复健康。
 
 ## 证书
 

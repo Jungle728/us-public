@@ -7,7 +7,9 @@ SECRETS_FILE="${SECRETS_FILE:-/root/proxy-subscription-secrets.env}"
 NGINX_IMAGE="${NGINX_IMAGE:-nginx:1.27-alpine}"
 XRAY_IMAGE="${XRAY_IMAGE:-proxy-subscription-xray:local}"
 SING_BOX_IMAGE="${SING_BOX_IMAGE:-proxy-subscription-sing-box:local}"
+WORKSPACE_ACTIVATION_API_PORT="${WORKSPACE_ACTIVATION_API_PORT:-8787}"
 STAMP="$(date +%Y%m%d%H%M%S)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIGRATION_STARTED=0
 MIGRATION_DONE=0
 
@@ -91,6 +93,33 @@ prepare_layout() {
   cp -a /var/www/html/. "$APP_DIR/www/"
   printf 'ok\n' >"$APP_DIR/www/index.html"
 
+  if [ -d "$SCRIPT_DIR/workspace-activation" ]; then
+    install -d -m 0755 "$APP_DIR/www/workspace-activation"
+    install -m 0644 \
+      "$SCRIPT_DIR/workspace-activation/index.html" \
+      "$SCRIPT_DIR/workspace-activation/styles.css" \
+      "$SCRIPT_DIR/workspace-activation/app.js" \
+      "$SCRIPT_DIR/workspace-activation/manifest.json" \
+      "$APP_DIR/www/workspace-activation/"
+
+    install -d -m 0755 "$APP_DIR/www/workspace-admin"
+    install -m 0644 \
+      "$SCRIPT_DIR/workspace-activation/admin.css" \
+      "$SCRIPT_DIR/workspace-activation/admin.js" \
+      "$SCRIPT_DIR/workspace-activation/admin.html" \
+      "$APP_DIR/www/workspace-admin/"
+    install -m 0644 \
+      "$SCRIPT_DIR/workspace-activation/admin.html" \
+      "$APP_DIR/www/workspace-admin/index.html"
+
+    if [ -f "$SCRIPT_DIR/workspace-activation/relay_server.py" ]; then
+      install -d -m 0755 "$APP_DIR/workspace-activation-api"
+      install -m 0755 \
+        "$SCRIPT_DIR/workspace-activation/relay_server.py" \
+        "$APP_DIR/workspace-activation-api/relay_server.py"
+    fi
+  fi
+
   install -m 0755 /usr/local/bin/xray "$APP_DIR/images/xray/xray"
   install -m 0755 /usr/bin/sing-box "$APP_DIR/images/sing-box/sing-box"
 
@@ -128,6 +157,27 @@ server {
         try_files \$uri =404;
     }
 
+    location ^~ /workspace-activation/api/ {
+        access_log off;
+        client_max_body_size 128k;
+        proxy_pass http://127.0.0.1:${WORKSPACE_ACTIVATION_API_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 120s;
+    }
+
+    location = /workspace-activation {
+        return 301 /workspace-activation/;
+    }
+
+    location ^~ /workspace-activation/ {
+        try_files \$uri \$uri/ /workspace-activation/index.html;
+    }
+
     location / {
         return 200 "ok\n";
         add_header Content-Type text/plain;
@@ -141,11 +191,70 @@ server {
     root /var/www/html;
     index index.html;
 
+    location ^~ /workspace-activation/api/ {
+        access_log off;
+        client_max_body_size 128k;
+        proxy_pass http://127.0.0.1:${WORKSPACE_ACTIVATION_API_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 120s;
+    }
+
     location / {
         try_files \$uri \$uri/ =404;
     }
 }
 EOF
+}
+
+install_workspace_activation_api() {
+  if [ ! -f "$APP_DIR/workspace-activation-api/relay_server.py" ]; then
+    return
+  fi
+
+  log "Installing workspace activation API relay"
+  if [ ! -f /etc/workspace-activation-admin-password ]; then
+    : "${WORKSPACE_ADMIN_PASSWORD:?set WORKSPACE_ADMIN_PASSWORD for the first installation}"
+    umask 077
+    printf '%s\n' "$WORKSPACE_ADMIN_PASSWORD" >/etc/workspace-activation-admin-password
+  fi
+  cat >/etc/systemd/system/workspace-activation-api.service <<EOF
+[Unit]
+Description=Workspace Activation API relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=WORKSPACE_ACTIVATION_HOST=127.0.0.1
+Environment=WORKSPACE_ACTIVATION_PORT=${WORKSPACE_ACTIVATION_API_PORT}
+Environment=WORKSPACE_ACTIVATION_CUSTOMERS_DB=/var/lib/workspace-activation/customers.sqlite3
+Environment=WORKSPACE_ADMIN_PASSWORD_FILE=/etc/workspace-activation-admin-password
+Environment=WORKSPACE_ADMIN_ORIGIN=https://panel.bigpandas.top
+ExecStart=/usr/bin/python3 ${APP_DIR}/workspace-activation-api/relay_server.py
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+StateDirectory=workspace-activation
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/workspace-activation
+ReadOnlyPaths=${APP_DIR}/workspace-activation-api
+ReadOnlyPaths=/etc/workspace-activation-admin-password
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable --now workspace-activation-api.service
 }
 
 write_xray_config() {
@@ -461,6 +570,9 @@ Host services disabled:
 
 Certbot renewal remains on the host, with a Docker deploy hook:
   /etc/letsencrypt/renewal-hooks/deploy/proxy-subscription-docker
+
+Workspace activation relay:
+  systemctl status workspace-activation-api.service
 EOF
 }
 
@@ -473,6 +585,7 @@ main() {
   write_xray_config
   write_sing_box_config
   write_compose
+  install_workspace_activation_api
   install_certbot_hook
   update_certbot_webroot
   build_and_validate

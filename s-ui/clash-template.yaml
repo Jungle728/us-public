@@ -67,6 +67,9 @@ dns:
     - 'https://1.1.1.1/dns-query#EXIT-MODE'
     - 'https://8.8.8.8/dns-query#EXIT-MODE'
   nameserver-policy:
+    geosite:category-ai-!cn:
+      - 'https://1.1.1.1/dns-query#EXIT-MODE'
+      - 'https://8.8.8.8/dns-query#EXIT-MODE'
     geosite:private:
       - 'https://223.5.5.5/dns-query#DIRECT'
       - 'https://1.12.12.12/dns-query#DIRECT'
@@ -103,9 +106,30 @@ proxy-groups:
   - name: EXIT-MODE
     type: select
     proxies:
+      - YUNTU-AAITR
+      - YUNTU-EXIT
+      - AAITR-EXIT
+  - name: YUNTU-AAITR
+    type: select
+    proxies:
       - YUNTU-AAITR-AUTO
+      - yuntu-aaitr-reality
+      - yuntu-aaitr-hy2
+      - yuntu-aaitr-anytls
+  - name: YUNTU-EXIT
+    type: select
+    proxies:
       - YUNTU-EXIT-AUTO
+      - yuntu-exit-reality
+      - yuntu-exit-hy2
+      - yuntu-exit-anytls
+  - name: AAITR-EXIT
+    type: select
+    proxies:
       - AAITR-EXIT-AUTO
+      - aaitr-exit-reality
+      - aaitr-exit-hy2
+      - aaitr-exit-anytls
   - name: YUNTU-AAITR-AUTO
     type: url-test
     include-all-proxies: true
@@ -139,11 +163,18 @@ proxy-groups:
 
 rules:
   # CN whitelist mode: private and China traffic go direct; everything else
-  # goes through the selected EXIT-MODE. BrowserLeaks is explicitly excluded
-  # because the upstream geosite database currently classifies it as CN.
+  # goes through the selected EXIT-MODE. Overseas AI takes precedence over CN
+  # to prevent an overlapping geosite entry from leaking through DIRECT.
+  - GEOSITE,category-ai-!cn,EXIT-MODE
+  # BrowserLeaks is explicitly excluded because the upstream geosite database
+  # currently classifies it as both CN and geolocation-!cn.
   - DOMAIN-SUFFIX,browserleaks.com,EXIT-MODE
   - GEOSITE,private,DIRECT
   - GEOIP,private,DIRECT,no-resolve
   - GEOSITE,cn,DIRECT
   - GEOIP,cn,DIRECT,no-resolve
   - MATCH,EXIT-MODE
+  # Fail closed if EXIT-MODE cannot carry a connection. This second MATCH is
+  # reached only when Mihomo skips the first one (for example, UDP disabled on
+  # the selected node); it prevents Mihomo's implicit DIRECT fallback.
+  - MATCH,REJECT

@@ -8,10 +8,10 @@ tcp-concurrent: true
 geodata-mode: true
 
 geox-url:
-  geoip: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat
-  geosite: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat
-  mmdb: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb
-  asn: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/GeoLite2-ASN.mmdb
+  geoip: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat
+  geosite: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat
+  mmdb: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb
+  asn: https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb
 
 profile:
   store-selected: true
@@ -44,6 +44,9 @@ sniffer:
       ports:
         - 443
         - 8443
+  skip-domain:
+    - Mijia Cloud
+    - '+.push.apple.com'
 
 dns:
   enable: true
@@ -79,6 +82,8 @@ dns:
   direct-nameserver-follow-policy: false
   fallback: []
   fake-ip-filter:
+    - 'geosite:private'
+    - 'geosite:cn'
     - '*.lan'
     - '*.local'
     - '*.localhost'
@@ -89,6 +94,7 @@ dns:
     - 'ntp.*.com'
     - '+.pool.ntp.org'
     - '+.market.xiaomi.com'
+    - '+.push.apple.com'
     - localhost.ptlogin2.qq.com
     - '*.msftncsi.com'
     - www.msftconnecttest.com
@@ -113,6 +119,7 @@ proxy-groups:
     include-all-proxies: true
 
 rules:
+  # Leak-test sites must never be classified as domestic traffic.
   - DOMAIN-SUFFIX,browserleaks.com,PROXY
   - DOMAIN-SUFFIX,ipleak.net,PROXY
   - DOMAIN-SUFFIX,dnsleaktest.com,PROXY
@@ -120,9 +127,26 @@ rules:
   - DOMAIN-SUFFIX,ip.net.coffee,PROXY
   - DOMAIN-SUFFIX,meowvps.com,PROXY
   - DOMAIN-SUFFIX,whoer.net,PROXY
+
+  # Keep critical foreign services ahead of geographical classification.
+  - DOMAIN-SUFFIX,anthropic.com,PROXY
+  - DOMAIN-SUFFIX,claude.ai,PROXY
+  - DOMAIN-SUFFIX,claudeusercontent.com,PROXY
+  - DOMAIN-SUFFIX,chatgpt.com,PROXY
+  - DOMAIN-SUFFIX,openai.com,PROXY
+  - DOMAIN-SUFFIX,oaistatic.com,PROXY
+  - DOMAIN-SUFFIX,oaiusercontent.com,PROXY
+  - DOMAIN,ai.google.dev,PROXY
+  - DOMAIN-SUFFIX,gemini.google.com,PROXY
+  - DOMAIN-SUFFIX,deepmind.com,PROXY
+  - DOMAIN-SUFFIX,deepmind.google,PROXY
+
   - GEOSITE,private,DIRECT
   - GEOIP,private,DIRECT,no-resolve
   - GEOSITE,geolocation-!cn,PROXY
   - GEOSITE,cn,DIRECT
+  - GEOIP,cloudflare,PROXY,no-resolve
+  - GEOIP,google,PROXY,no-resolve
+  - GEOIP,telegram,PROXY,no-resolve
   - GEOIP,cn,DIRECT,no-resolve
   - MATCH,PROXY

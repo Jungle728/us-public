@@ -5,7 +5,9 @@ stack_dir="${STACK_DIR:-/opt/3x-ui}"
 container="${XUI_CONTAINER:-3x-ui}"
 
 cd "$stack_dir"
-docker compose up -d x-ui
+# Recreate the container so a replaced single-file bind mount is rebound to
+# the current template inode before it is read below.
+docker compose up -d --force-recreate x-ui
 
 docker exec -i "$container" python3 - <<'PY'
 import datetime

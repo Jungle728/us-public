@@ -20,11 +20,11 @@
 
 | 分组 | 链路 | 出口 IP 类型 | 推荐用途 |
 |---|---|---|---|
-| `YUNTU-AAITR-AUTO` | 客户端 -> YunTu -> AaITR -> 互联网 | AaITR 家宽 | 默认主力，适合 Google、Gmail、Gemini、Claude、ChatGPT、Telegram 等 |
-| `YUNTU-EXIT-AUTO` | 客户端 -> YunTu -> 互联网 | YunTu 机房 | 备用、下载、对 IP 质量不敏感的流量 |
-| `AAITR-EXIT-AUTO` | 客户端 -> AaITR -> 互联网 | AaITR 家宽 | 直连 AaITR 备用与对照测试 |
+| `YUNTU-AAITR` | 客户端 -> YunTu -> AaITR -> 互联网 | AaITR 家宽 | 默认主力，适合 Google、Gmail、Gemini、Claude、ChatGPT、Telegram 等 |
+| `YUNTU-EXIT` | 客户端 -> YunTu -> 互联网 | YunTu 机房 | 备用、下载、对 IP 质量不敏感的流量 |
+| `AAITR-EXIT` | 客户端 -> AaITR -> 互联网 | AaITR 家宽 | 直连 AaITR 备用与对照测试 |
 
-每个 AUTO 分组内部自动在 Reality、Hysteria2、AnyTLS 三种协议中选择延迟最低的节点。
+每个模式组默认使用对应的 `*-AUTO`，自动在 Reality、Hysteria2、AnyTLS 三种协议中选择延迟最低的节点；需要排障或保持固定传输时，也可以在模式组内手动指定协议。
 
 ## 目录结构
 
@@ -43,19 +43,24 @@ workspace-activation/
 
 ```yaml
 rules:
+  - GEOSITE,category-ai-!cn,EXIT-MODE
   - DOMAIN-SUFFIX,browserleaks.com,EXIT-MODE
   - GEOSITE,private,DIRECT
   - GEOIP,private,DIRECT,no-resolve
   - GEOSITE,cn,DIRECT
   - GEOIP,cn,DIRECT,no-resolve
   - MATCH,EXIT-MODE
+  - MATCH,REJECT
 ```
 
 含义：
 
 - 局域网和国内域名/IP 走 `DIRECT`。
 - 其他全部走 `EXIT-MODE`。
+- 海外 AI 域名优先走 `EXIT-MODE`，即使与 `geosite:cn` 重叠也不会直连；其 DNS 同样经海外 DoH 和当前出口组解析。
 - `browserleaks.com` 被前置修正，因为当前 geosite 数据库会把它归到 `cn`。
+- 最后的 `MATCH,REJECT` 只在 `EXIT-MODE` 无法承载当前连接、被 Mihomo 跳过时生效，保证未知流量失败关闭而不是隐式直连。
+- 公开 Clash 订阅为 Reality、Hysteria2 和 AnyTLS 明确启用 UDP；Reality 使用 `xudp`，避免浏览器 QUIC 绕过所选出口。
 
 如果以后发现某个域名误分类，优先在 `GEOSITE,cn,DIRECT` 前添加个人补丁规则。
 
