@@ -7,6 +7,8 @@ import argparse
 import importlib.util
 from pathlib import Path
 
+from verify_shadowrocket import validate as verify_shadowrocket
+
 
 MODULE_PATH = Path(__file__).with_name("sui_runtime.py")
 SPEC = importlib.util.spec_from_file_location("sui_support", MODULE_PATH)
@@ -51,11 +53,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "check",
-        choices=("all", "subscriptions", "protocols", "proxies"),
+        choices=("all", "subscriptions", "protocols", "proxies", "shadowrocket"),
         default="all",
         nargs="?",
     )
     args = parser.parse_args()
+    if args.check in {"all", "shadowrocket"}:
+        verify_shadowrocket()
+    if args.check == "shadowrocket":
+        return
     state = production_state()
     print(f"production subscription clients: {len(state['clients'])}")
     if args.check in {"all", "subscriptions"}:

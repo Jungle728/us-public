@@ -32,7 +32,12 @@ def validate_sources() -> None:
     for unit in UNITS:
         if not (ROOT / "systemd" / unit).is_file():
             raise RuntimeError(f"missing systemd unit: {unit}")
-    for script in ("export_yuntu_exit.py", "sync_yuntu_exit.py"):
+    for script in (
+        "apply_desktop_direct_nodes.py",
+        "export_yuntu_exit.py",
+        "reconcile_production_clients.py",
+        "sync_yuntu_exit.py",
+    ):
         if not (ROOT / script).is_file():
             raise RuntimeError(f"missing synchronization script: {script}")
 

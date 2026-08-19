@@ -16,11 +16,13 @@
 | TCP 443 | HAProxy TCP | Reality 中转到 AaITR，同时承载 HTTPS 代理 SNI 路由 |
 | UDP 443 | GOST UDP | Hysteria2 中转到 AaITR |
 | TCP 8443 | HAProxy TCP | AnyTLS 中转到 AaITR |
+| TCP+UDP 10443 | HAProxy + GOST UDP | Shadowsocks 2022 中转到 AaITR |
 | TCP 1080 | HAProxy TCP | SOCKS5 代理入口，后端仍由 AaITR 认证 |
 | TCP 8080 | HAProxy TCP | HTTP 代理入口，后端仍由 AaITR 认证 |
 | TCP 1443 | sing-box | YunTu Reality 直接出口 |
 | UDP 2443 | sing-box | YunTu Hysteria2 直接出口 |
 | TCP 9443 | sing-box | YunTu AnyTLS 直接出口 |
+| TCP+UDP 10444 | sing-box | YunTu Shadowsocks 2022 直接出口 |
 
 ## 文件
 

@@ -161,6 +161,10 @@ def password() -> str:
     return secrets.token_hex(16)
 
 
+def shadowsocks_key() -> str:
+    return base64.b64encode(secrets.token_bytes(16)).decode()
+
+
 class SUI:
     def __init__(self) -> None:
         self.jar = CookieJar()
@@ -320,6 +324,7 @@ def client_payload(item: dict) -> dict:
             "vless": {"name": user, "uuid": item["uuid"], "flow": item["flow"]},
             "hysteria2": {"name": user, "password": password()},
             "anytls": {"name": user, "password": password()},
+            "shadowsocks16": {"name": user, "password": shadowsocks_key()},
         },
         "inbounds": [],
         "links": [],
@@ -406,6 +411,20 @@ def inbound_payloads(tls_ids: dict) -> list[dict]:
         },
         {
             "id": 0,
+            "type": "shadowsocks",
+            "tag": "canary-shadowsocks",
+            "listen": "0.0.0.0",
+            "listen_port": 34443,
+            "method": "2022-blake3-aes-128-gcm",
+            "password": shadowsocks_key(),
+            "managed": False,
+            "multiplex": {},
+            "tls_id": 0,
+            "addrs": [{"server": PUBLIC_HOST, "server_port": 34443, "remark": "yuntu-canary"}],
+            "out_json": {},
+        },
+        {
+            "id": 0,
             "type": "socks",
             "tag": "canary-socks5",
             "listen": "127.0.0.1",
@@ -467,8 +486,8 @@ def subscription_links(client_name: str) -> dict[str, str]:
 
 
 def verify_subscriptions(source: dict) -> None:
-    expected_links = {"vless", "hysteria2", "anytls"}
-    expected_json = {"vless", "hysteria2", "anytls"}
+    expected_links = {"vless", "hysteria2", "anytls", "ss"}
+    expected_json = {"vless", "hysteria2", "anytls", "shadowsocks"}
     for item in source["clients"]:
         raw = fetch_subscription(item["name"])
         decoded = raw
@@ -498,7 +517,7 @@ def verify_subscriptions(source: dict) -> None:
             )
 
         clash = fetch_subscription(item["name"], "clash")
-        for protocol in ("vless", "hysteria2", "anytls"):
+        for protocol in ("vless", "hysteria2", "anytls", "ss"):
             if f"type: {protocol}" not in clash:
                 fail(f"Clash subscription is missing protocol: {protocol}")
     print(f"verified subscriptions: {len(source['clients'])}")
@@ -514,6 +533,7 @@ def verify_protocols(source: dict) -> None:
         "hysteria2": "hysteria2",
         "hy2": "hysteria2",
         "anytls": "anytls",
+        "ss": "shadowsocks",
     }
     checks = []
     for client in source["clients"]:
@@ -524,7 +544,7 @@ def verify_protocols(source: dict) -> None:
                 checks.append((client["name"], protocol, links[scheme]))
                 found.add(protocol)
         present = {protocol_aliases[s] for s in links if s in protocol_aliases}
-        missing = {"vless", "hysteria2", "anytls"} - present
+        missing = {"vless", "hysteria2", "anytls", "shadowsocks"} - present
         if missing:
             fail(f"subscription is missing protocol links: {sorted(missing)}")
 
@@ -549,10 +569,10 @@ def verify_protocols(source: dict) -> None:
                 sui.delete_outbound(tag)
             except Exception as exc:  # noqa: BLE001
                 fail(f"unable to remove temporary outbound: {type(exc).__name__}")
-    expected = len(source["clients"]) * 3
+    expected = len(source["clients"]) * 4
     if verified != expected:
         fail(f"verified {verified} protocol outbounds, expected {expected}")
-    print("VLESS Reality, Hysteria2, and AnyTLS real outbound checks: complete")
+    print("VLESS Reality, Hysteria2, AnyTLS, and Shadowsocks real outbound checks: complete")
 
 
 def verify_forward_proxies(source: dict) -> None:
@@ -658,7 +678,7 @@ def main() -> int:
             continue
         init_ids = (
             client_ids
-            if inbound["tag"] in {"canary-reality", "canary-hysteria2", "canary-anytls"}
+            if inbound["tag"] in {"canary-reality", "canary-hysteria2", "canary-anytls", "canary-shadowsocks"}
             else [proxy_id]
         )
         sui.save("inbounds", inbound, ",".join(str(x) for x in init_ids))
@@ -666,7 +686,7 @@ def main() -> int:
     current_inbounds = {x.get("tag"): x for x in (sui.get("inbounds") or [])}
     core_ids = [
         int(current_inbounds[tag]["id"])
-        for tag in ("canary-reality", "canary-hysteria2", "canary-anytls")
+        for tag in ("canary-reality", "canary-hysteria2", "canary-anytls", "canary-shadowsocks")
     ]
     proxy_ids = [
         int(current_inbounds[tag]["id"])

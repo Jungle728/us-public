@@ -67,6 +67,15 @@ dns:
     - 'https://1.1.1.1/dns-query#EXIT-MODE'
     - 'https://8.8.8.8/dns-query#EXIT-MODE'
   nameserver-policy:
+    '+.bigpandas.top':
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
+    shu26.cfd:
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
+    ucloud-frp.sometimesnaive.top:
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
     geosite:category-ai-!cn:
       - 'https://1.1.1.1/dns-query#EXIT-MODE'
       - 'https://8.8.8.8/dns-query#EXIT-MODE'
@@ -116,6 +125,7 @@ proxy-groups:
       - yuntu-aaitr-reality
       - yuntu-aaitr-hy2
       - yuntu-aaitr-anytls
+      - yuntu-aaitr-ss
   - name: YUNTU-EXIT
     type: select
     proxies:
@@ -123,6 +133,7 @@ proxy-groups:
       - yuntu-exit-reality
       - yuntu-exit-hy2
       - yuntu-exit-anytls
+      - yuntu-exit-ss
   - name: AAITR-EXIT
     type: select
     proxies:
@@ -130,6 +141,7 @@ proxy-groups:
       - aaitr-exit-reality
       - aaitr-exit-hy2
       - aaitr-exit-anytls
+      - aaitr-exit-ss
   - name: YUNTU-AAITR-AUTO
     type: url-test
     include-all-proxies: true
@@ -165,6 +177,9 @@ rules:
   # CN whitelist mode: private and China traffic go direct; everything else
   # goes through the selected EXIT-MODE. Overseas AI takes precedence over CN
   # to prevent an overlapping geosite entry from leaking through DIRECT.
+  - DOMAIN-SUFFIX,bigpandas.top,DIRECT
+  - DOMAIN-SUFFIX,shu26.cfd,DIRECT
+  - DOMAIN,ucloud-frp.sometimesnaive.top,DIRECT
   - GEOSITE,category-ai-!cn,EXIT-MODE
   # BrowserLeaks is explicitly excluded because the upstream geosite database
   # currently classifies it as both CN and geolocation-!cn.

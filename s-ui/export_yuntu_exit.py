@@ -29,7 +29,7 @@ def decode_json(value: Any, fallback: Any = None) -> Any:
     return value
 
 
-def load_rows(connection: sqlite3.Connection) -> tuple[list[dict], dict, dict]:
+def load_rows(connection: sqlite3.Connection) -> tuple[list[dict], dict, dict, dict]:
     connection.row_factory = sqlite3.Row
     clients = []
     for row in connection.execute(
@@ -44,7 +44,13 @@ def load_rows(connection: sqlite3.Connection) -> tuple[list[dict], dict, dict]:
         vless = config.get("vless") or {}
         hy2 = config.get("hysteria2") or {}
         anytls = config.get("anytls") or {}
-        if not vless.get("uuid") or not hy2.get("password") or not anytls.get("password"):
+        shadowsocks = config.get("shadowsocks16") or {}
+        if (
+            not vless.get("uuid")
+            or not hy2.get("password")
+            or not anytls.get("password")
+            or not shadowsocks.get("password")
+        ):
             fail(f"production client {row['name']} is missing protocol credentials")
         clients.append(
             {
@@ -53,6 +59,7 @@ def load_rows(connection: sqlite3.Connection) -> tuple[list[dict], dict, dict]:
                 "vless_flow": vless.get("flow", "xtls-rprx-vision"),
                 "hy2_password": hy2["password"],
                 "anytls_password": anytls["password"],
+                "ss_password": shadowsocks["password"],
             }
         )
     if not clients:
@@ -66,10 +73,27 @@ def load_rows(connection: sqlite3.Connection) -> tuple[list[dict], dict, dict]:
         fail("expected TLS rows 1 (Reality) and 2 (certificate TLS)")
     reality_server = decode_json(tls_rows[1]["server"], {})
     certificate_server = decode_json(tls_rows[2]["server"], {})
-    return clients, reality_server, certificate_server
+    ss_row = connection.execute(
+        "select options from inbounds where tag = ? and type = ?",
+        ("yuntu-shadowsocks", "shadowsocks"),
+    ).fetchone()
+    if ss_row is None:
+        fail("the production Shadowsocks inbound is missing")
+    shadowsocks_server = decode_json(ss_row["options"], {})
+    if (
+        shadowsocks_server.get("method") != "2022-blake3-aes-128-gcm"
+        or not shadowsocks_server.get("password")
+    ):
+        fail("the production Shadowsocks inbound is incomplete")
+    return clients, reality_server, certificate_server, shadowsocks_server
 
 
-def build_config(clients: list[dict], reality_server: dict, certificate_server: dict) -> dict:
+def build_config(
+    clients: list[dict],
+    reality_server: dict,
+    certificate_server: dict,
+    shadowsocks_server: dict,
+) -> dict:
     reality = reality_server.get("reality") or {}
     handshake = reality.get("handshake") or {}
     short_id = reality.get("short_id") or []
@@ -157,6 +181,18 @@ def build_config(clients: list[dict], reality_server: dict, certificate_server: 
                     "7=500-1000",
                 ],
             },
+            {
+                "type": "shadowsocks",
+                "tag": "yuntu-exit-ss",
+                "listen": "0.0.0.0",
+                "listen_port": 10444,
+                "method": shadowsocks_server["method"],
+                "password": shadowsocks_server["password"],
+                "users": [
+                    {"name": client["name"], "password": client["ss_password"]}
+                    for client in clients
+                ],
+            },
         ],
         "outbounds": [{"type": "direct", "tag": "direct"}],
     }
@@ -169,12 +205,16 @@ def main() -> None:
     if not DATABASE.exists():
         fail("s-ui database is missing")
     with sqlite3.connect(DATABASE) as connection:
-        clients, reality_server, certificate_server = load_rows(connection)
-    config = build_config(clients, reality_server, certificate_server)
+        clients, reality_server, certificate_server, shadowsocks_server = load_rows(
+            connection
+        )
+    config = build_config(
+        clients, reality_server, certificate_server, shadowsocks_server
+    )
     args.output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     args.output.write_text(json.dumps(config, indent=2, sort_keys=False) + "\n")
     args.output.chmod(0o600)
-    print(f"rendered YunTu exit config: {len(clients)} production clients, 3 inbounds")
+    print(f"rendered YunTu exit config: {len(clients)} production clients, 4 inbounds")
 
 
 if __name__ == "__main__":

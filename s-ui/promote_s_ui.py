@@ -34,6 +34,12 @@ PROFILES = {
         "listen_port": 33443,
         "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 8443, "remark": "-anytls"}],
     },
+    "canary-shadowsocks": {
+        "tag": "yuntu-shadowsocks",
+        "listen": "0.0.0.0",
+        "listen_port": 34443,
+        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 10443, "remark": "-ss"}],
+    },
     "canary-socks5": {
         "tag": "yuntu-socks5",
         "listen": "0.0.0.0",

@@ -16,6 +16,7 @@ from pathlib import Path
 ADMIN_PASSWORD = Path(__file__).resolve().with_name(".admin-password")
 SUI_BASE = "http://127.0.0.1:3095/app"
 SUI_SUB = "http://127.0.0.1:3096"
+PUBLIC_SUB = "https://sub.bigpandas.top"
 TLS_SNI = "yuntu.bigpandas.top"
 AAITR_IPV4 = "99.88.84.197"
 CLASH_TEMPLATE = Path(__file__).resolve().with_name("clash-template.yaml")
@@ -29,6 +30,9 @@ DISPLAY_NAMES = {
     "yuntu-exit-reality",
     "yuntu-exit-hy2",
     "yuntu-exit-anytls",
+    "yuntu-aaitr-ss",
+    "aaitr-exit-ss",
+    "yuntu-exit-ss",
 }
 
 
@@ -145,9 +149,13 @@ class SUI:
 
 
 def fetch_subscription(client_name: str, format_name: str = "") -> str:
-    path = f"{SUI_SUB}/sub/{urllib.parse.quote(client_name, safe='')}"
-    if format_name:
-        path += "?" + urllib.parse.urlencode({"format": format_name})
+    encoded_name = urllib.parse.quote(client_name, safe="")
+    if format_name in {"clash", "json"}:
+        path = f"{PUBLIC_SUB}/{format_name}/{encoded_name}"
+    else:
+        path = f"{SUI_SUB}/sub/{encoded_name}"
+        if format_name:
+            path += "?" + urllib.parse.urlencode({"format": format_name})
     request = urllib.request.Request(path, headers={"Host": "sub.bigpandas.top"})
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 200:
@@ -186,7 +194,7 @@ def link_route_marker(link: str) -> str:
     port = parsed.port
     if hostname == "proxy.bigpandas.top":
         return "aaitr-exit"
-    if hostname == "yuntu.bigpandas.top" and port in {1443, 2443, 9443}:
+    if hostname == "yuntu.bigpandas.top" and port in {1443, 2443, 9443, 10444}:
         return "yuntu-exit"
     if hostname == "yuntu.bigpandas.top":
         return "yuntu-aaitr"
@@ -311,14 +319,30 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
     expected = clash_template_rules()
     if actual != expected:
         fail("Clash subscription routing rules do not match the production policy")
+    direct_rules = (
+        "DOMAIN-SUFFIX,bigpandas.top,DIRECT",
+        "DOMAIN-SUFFIX,shu26.cfd,DIRECT",
+        "DOMAIN,ucloud-frp.sometimesnaive.top,DIRECT",
+    )
     ai_rule = "GEOSITE,category-ai-!cn,EXIT-MODE"
     cn_rule = "GEOSITE,cn,DIRECT"
+    for direct_rule in direct_rules:
+        if direct_rule not in actual or actual.index(direct_rule) > actual.index(ai_rule):
+            fail(f"the explicit direct rule must take precedence: {direct_rule}")
     if ai_rule not in actual or actual.index(ai_rule) > actual.index(cn_rule):
         fail("the overseas AI rule must take precedence over the CN direct rule")
     if actual[-2:] != ["MATCH,EXIT-MODE", "MATCH,REJECT"]:
         fail("Clash subscription must fail closed after the EXIT-MODE catch-all")
     if "geosite:category-ai-!cn:" not in clash:
         fail("Clash subscription is missing the overseas AI DNS policy")
+    direct_dns_policies = {
+        "+.bigpandas.top": ("'+.bigpandas.top':", "+.bigpandas.top:"),
+        "shu26.cfd": ("shu26.cfd:",),
+        "ucloud-frp.sometimesnaive.top": ("ucloud-frp.sometimesnaive.top:",),
+    }
+    for domain, serialized_forms in direct_dns_policies.items():
+        if not any(serialized in clash for serialized in serialized_forms):
+            fail(f"Clash subscription is missing the direct DNS policy: {domain}")
     required_sections = ("mode: rule", "dns:", "sniffer:", "tun:", "proxy-groups:")
     missing = [section for section in required_sections if section not in lines]
     if missing:
@@ -347,18 +371,21 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
             "yuntu-aaitr-reality",
             "yuntu-aaitr-hy2",
             "yuntu-aaitr-anytls",
+            "yuntu-aaitr-ss",
         ),
         "YUNTU-EXIT": (
             "YUNTU-EXIT-AUTO",
             "yuntu-exit-reality",
             "yuntu-exit-hy2",
             "yuntu-exit-anytls",
+            "yuntu-exit-ss",
         ),
         "AAITR-EXIT": (
             "AAITR-EXIT-AUTO",
             "aaitr-exit-reality",
             "aaitr-exit-hy2",
             "aaitr-exit-anytls",
+            "aaitr-exit-ss",
         ),
     }
     for group, members in manual_groups.items():
@@ -367,19 +394,21 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
 
 
 def verify_subscriptions(source: dict) -> None:
-    expected = {"vless", "hysteria2", "anytls"}
+    raw_expected = {"vless", "hysteria2", "anytls", "ss"}
+    json_expected = {"vless", "hysteria2", "anytls", "shadowsocks"}
+    clash_expected = {"vless", "hysteria2", "anytls", "ss"}
     for item in source["clients"]:
         link_lines = subscription_link_lines(item["name"])
         schemes = [line.split("://", 1)[0].lower() for line in link_lines]
-        missing = expected - set(schemes)
+        missing = raw_expected - set(schemes)
         if missing:
             fail(f"raw subscription is missing protocols: {sorted(missing)}")
-        if len(link_lines) != 9:
-            fail(f"raw subscription should contain 9 desktop links, found {len(link_lines)}")
+        if len(link_lines) != 12:
+            fail(f"raw subscription should contain 12 desktop links, found {len(link_lines)}")
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
             count = sum(link_route_marker(line) == marker for line in link_lines)
-            if count != 3:
-                fail(f"raw subscription should contain 3 {marker} links, found {count}")
+            if count != 4:
+                fail(f"raw subscription should contain 4 {marker} links, found {count}")
         display_names = {link_display_name(line) for line in link_lines}
         if display_names != DISPLAY_NAMES:
             fail(f"raw subscription display names are unexpected: {sorted(display_names)}")
@@ -392,25 +421,27 @@ def verify_subscriptions(source: dict) -> None:
         outbounds = [
             outbound
             for outbound in json_sub.get("outbounds", [])
-            if isinstance(outbound, dict) and outbound.get("type") in expected
+            if isinstance(outbound, dict) and outbound.get("type") in json_expected
         ]
         outbound_types = {outbound.get("type") for outbound in outbounds}
-        missing = expected - outbound_types
+        missing = json_expected - outbound_types
         if missing:
             fail(f"JSON subscription is missing protocols: {sorted(missing)}")
-        if len(outbounds) != 9:
-            fail(f"JSON subscription should contain 9 desktop outbounds, found {len(outbounds)}")
+        if len(outbounds) != 12:
+            fail(f"JSON subscription should contain 12 desktop outbounds, found {len(outbounds)}")
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
             count = sum(marker in str(outbound.get("tag", "")) for outbound in outbounds)
-            if count != 3:
-                fail(f"JSON subscription should contain 3 {marker} outbounds, found {count}")
+            if count != 4:
+                fail(f"JSON subscription should contain 4 {marker} outbounds, found {count}")
 
         clash = fetch_subscription(item["name"], "clash")
-        for protocol in expected:
+        for protocol in clash_expected:
             if f"type: {protocol}" not in clash:
                 fail(f"Clash subscription is missing protocol: {protocol}")
+        if clash.count("type: ss\n      udp: true") != 3:
+            fail("Clash subscription should expose UDP on all three Shadowsocks nodes")
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
-            if clash.count(marker) < 3:
+            if clash.count(marker) < 4:
                 fail(f"Clash subscription is missing {marker} nodes")
         for protocol in ("socks5", "socks", "http"):
             if f"type: {protocol}" in clash:
@@ -428,6 +459,7 @@ def verify_protocols(source: dict) -> None:
         "hysteria2": "hysteria2",
         "hy2": "hysteria2",
         "anytls": "anytls",
+        "ss": "shadowsocks",
     }
     checks = []
     for client in source["clients"]:
@@ -444,7 +476,7 @@ def verify_protocols(source: dict) -> None:
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
             missing = {
                 protocol
-                for protocol in ("vless", "hysteria2", "anytls")
+                for protocol in ("vless", "hysteria2", "anytls", "shadowsocks")
                 if (protocol, marker) not in found
             }
             if missing:
@@ -468,10 +500,10 @@ def verify_protocols(source: dict) -> None:
                 sui.delete_outbound(tag)
             except Exception as exc:  # noqa: BLE001
                 fail(f"unable to remove temporary outbound: {type(exc).__name__}")
-    expected = len(source["clients"]) * 9
+    expected = len(source["clients"]) * 12
     if verified != expected:
         fail(f"verified {verified} protocol outbounds, expected {expected}")
-    print("VLESS Reality, Hysteria2, and AnyTLS real outbound checks: complete")
+    print("VLESS Reality, Hysteria2, AnyTLS, and Shadowsocks real outbound checks: complete")
 
 
 def verify_forward_proxies(source: dict) -> None:

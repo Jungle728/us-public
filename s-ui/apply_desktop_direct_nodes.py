@@ -77,6 +77,26 @@ DESKTOP_ADDRS = {
             "server_port": 9443,
         },
     ],
+    "yuntu-shadowsocks": [
+        {
+            "name": "yuntu-aaitr-ss",
+            "remark": "-yuntu-aaitr",
+            "server": "yuntu.bigpandas.top",
+            "server_port": 10443,
+        },
+        {
+            "name": "aaitr-exit-ss",
+            "remark": "-aaitr-exit",
+            "server": "proxy.bigpandas.top",
+            "server_port": 34443,
+        },
+        {
+            "name": "yuntu-exit-ss",
+            "remark": "-yuntu-exit",
+            "server": "yuntu.bigpandas.top",
+            "server_port": 10444,
+        },
+    ],
 }
 
 FORWARD_PROXY_TAGS = {"yuntu-socks5", "yuntu-http", "aaitr-https"}
@@ -85,6 +105,7 @@ SCHEME_TAGS = {
     "vless": "yuntu-reality",
     "hysteria2": "yuntu-hysteria2",
     "anytls": "yuntu-anytls",
+    "ss": "yuntu-shadowsocks",
 }
 
 
@@ -150,10 +171,11 @@ def backup_database() -> Path:
     return destination
 
 
-def main() -> None:
+def reconcile_desktop_nodes() -> bool:
     if not DATABASE.exists():
         fail("s-ui database is missing")
-    backup = backup_database()
+    inbound_updates: dict[str, list[dict]] = {}
+    client_updates: dict[int, list[dict]] = {}
     with sqlite3.connect(DATABASE) as connection:
         connection.row_factory = sqlite3.Row
         rows = connection.execute(
@@ -165,11 +187,9 @@ def main() -> None:
             fail(f"missing desktop inbounds: {sorted(missing)}")
 
         for tag, addrs in DESKTOP_ADDRS.items():
-            connection.execute(
-                "update inbounds set addrs = ? where tag = ?",
-                (sqlite3.Binary(json.dumps(addrs, separators=(",", ":")).encode()), tag),
-            )
-            print(f"updated {tag}: {len(addrs)} subscription addresses")
+            current_addrs = json.loads(by_tag[tag]["addrs"] or "[]")
+            if current_addrs != addrs:
+                inbound_updates[tag] = addrs
 
         proxy_tags = {
             row["tag"]
@@ -179,8 +199,17 @@ def main() -> None:
         if proxy_tags != FORWARD_PROXY_TAGS:
             fail("forward proxy inbounds are incomplete")
 
+        production_ids = {
+            int(by_tag[tag]["id"])
+            for tag in DESKTOP_ADDRS
+        }
+        forward_ids = {
+            int(by_tag[tag]["id"])
+            for tag in FORWARD_PROXY_TAGS
+        }
+
         clients = connection.execute(
-            "select name, `group`, inbounds, links from clients order by id"
+            "select id, name, `group`, inbounds, links from clients order by id"
         ).fetchall()
         production_count = 0
         proxy_count = 0
@@ -188,33 +217,51 @@ def main() -> None:
             inbound_ids = json.loads(client["inbounds"] or "[]")
             if client["group"] == "aaitr-production":
                 production_count += 1
-                if inbound_ids != [1, 2, 3]:
+                if set(inbound_ids) != production_ids:
                     fail(f"unexpected desktop inbounds for {client['name']}")
                 current_links = json.loads(client["links"] or "[]")
                 links = desktop_links(current_links)
-                connection.execute(
-                    "update clients set links = ? where name = ?",
-                    (
-                        sqlite3.Binary(
-                            json.dumps(links, separators=(",", ":")).encode()
-                        ),
-                        client["name"],
-                    ),
-                )
+                if current_links != links:
+                    client_updates[int(client["id"])] = links
             if client["group"] == "forward-proxy":
                 proxy_count += 1
-                if inbound_ids != [4, 5, 6]:
+                if set(inbound_ids) != forward_ids:
                     fail(f"unexpected forward-proxy inbounds for {client['name']}")
         if production_count == 0:
             fail("no aaitr-production clients found")
         if proxy_count != 1:
             fail(f"expected one forward-proxy client, found {proxy_count}")
 
+    if not inbound_updates and not client_updates:
+        print("desktop subscription addresses and names already up to date")
+        return False
+
+    backup = backup_database()
+    with sqlite3.connect(DATABASE) as connection:
+        for tag, addrs in inbound_updates.items():
+            connection.execute(
+                "update inbounds set addrs = ? where tag = ?",
+                (sqlite3.Binary(json.dumps(addrs, separators=(",", ":")).encode()), tag),
+            )
+            print(f"updated {tag}: {len(addrs)} subscription addresses")
+        for client_id, links in client_updates.items():
+            connection.execute(
+                "update clients set links = ? where id = ?",
+                (
+                    sqlite3.Binary(json.dumps(links, separators=(",", ":")).encode()),
+                    client_id,
+                ),
+            )
         connection.commit()
 
     print(f"production desktop clients checked: {production_count}")
     print("forward proxy client left unchanged")
     print(f"database backup: {backup}")
+    return True
+
+
+def main() -> None:
+    reconcile_desktop_nodes()
 
 
 if __name__ == "__main__":

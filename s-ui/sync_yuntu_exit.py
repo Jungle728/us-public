@@ -13,7 +13,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+from apply_desktop_direct_nodes import reconcile_desktop_nodes
 from export_yuntu_exit import main as export_yuntu_exit_main
+from reconcile_production_clients import reconcile_production_clients
 
 
 ROOT = Path(__file__).resolve().parent
@@ -142,6 +144,8 @@ def main() -> None:
     LOCK_FILE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with LOCK_FILE.open("w") as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        reconcile_production_clients()
+        reconcile_desktop_nodes()
         with tempfile.TemporaryDirectory(prefix="yuntu-exit-sync-", dir=str(ROOT)) as tmp:
             tmp_config = Path(tmp) / "config.json"
             render_local_config()
