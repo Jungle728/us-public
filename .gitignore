@@ -39,6 +39,9 @@ aaitr-s-ui/edge/certbot-logs/
 
 # 服务器本地迁移归档，禁止进入公开仓库
 migration/
+
+# 仓库根目录运行备份
+backups/
 s-ui-edge/letsencrypt/
 s-ui-edge/certbot-www/
 s-ui-edge/certbot-lib/
