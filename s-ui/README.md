@@ -6,7 +6,7 @@
 
 - 管理生产订阅用户和转发代理用户。
 - 生成 raw / sing-box JSON / Clash 订阅。
-- 提供 Reality、Hysteria2、AnyTLS、Shadowsocks 2022、SOCKS5、HTTP、HTTPS 入站。
+- 提供 Reality、Hysteria2 桌面入站，以及一个直连 AaITR 的认证 SOCKS5 转发入口。
 - 渲染 YunTu 直接出口配置，并通过 systemd timer 同步到 YunTu。
 - 提供验证脚本，检查订阅、协议链路和 forward proxy 出口。
 
@@ -25,13 +25,9 @@
 | `127.0.0.1:3096` | 订阅服务 |
 | `127.0.0.1:31443` | VLESS Reality，由 edge SNI 路由选择 |
 | `32443/udp` | Hysteria2，可经 YunTu UDP 443 中转或 AaITR 直连 |
-| `33443/tcp` | AnyTLS，可经 YunTu TCP 8443 中转或 AaITR 直连 |
-| `34443/tcp+udp` | Shadowsocks 2022，可经 YunTu 10443 中转或 AaITR 直连 |
-| `31080/tcp` | SOCKS5 后端，仅供 YunTu 入口转发 |
-| `31081/tcp` | HTTP 后端，仅供 YunTu 入口转发 |
-| `127.0.0.1:31444` | HTTPS 代理后端，由 edge SNI 路由选择 |
+| `1080/tcp` | 认证 SOCKS5，直连 AaITR 出口，供服务器/API 使用 |
 
-s-ui 容器使用 host network，因此公网暴露由 UFW 和 `s-ui-edge` 控制。SOCKS5/HTTP/HTTPS 代理不做来源白名单，但仍要求 s-ui 用户名/密码认证。
+s-ui 容器使用 host network，因此公网暴露由 UFW 和 `s-ui-edge` 控制。SOCKS5 不做来源白名单，但仍要求 s-ui 用户名/密码认证。
 
 ## Clash 分流策略
 
@@ -61,7 +57,7 @@ rules:
 - 海外 AI 域名优先走 `EXIT-MODE`，并通过海外 DoH 解析，避免与 `geosite:cn` 重叠时误走直连。
 - `browserleaks.com` 被显式放入 `EXIT-MODE`，用于修正上游 geosite 数据库误分类。
 - 最后的 `MATCH,REJECT` 是 fail-closed 保护：只有所选出口不支持当前流量、导致前一个 `MATCH,EXIT-MODE` 被 Mihomo 跳过时才会命中，防止内核隐式回落到 `DIRECT`。
-- Clash 订阅入口会为 Reality / Hysteria2 / AnyTLS / Shadowsocks 2022 明确写入 UDP 能力；Reality 同时使用 `xudp` 封装，保证浏览器 QUIC 也服从 `EXIT-MODE`。
+- Clash 订阅入口只为 Reality / Hysteria2 明确写入 UDP 能力；Reality 同时使用 `xudp` 封装，保证浏览器 QUIC 也服从 `EXIT-MODE`。
 
 `EXIT-MODE` 下有三个手动模式组：
 
@@ -71,7 +67,7 @@ rules:
 | `YUNTU-EXIT` | 客户端 -> YunTu -> 目标网站 |
 | `AAITR-EXIT` | 客户端 -> AaITR -> 目标网站 |
 
-每个手动模式组默认选择对应的 `*-AUTO` URLTest，也允许固定 Reality、Hysteria2、AnyTLS 或 Shadowsocks 2022。AUTO 仍只会在同一条出口链路的四个协议中选择延迟最低的节点，不会跨模式改变出口。
+每个手动模式组默认选择对应的 `*-AUTO` URLTest，也允许固定 Reality 或 Hysteria2。AUTO 仍只会在同一条出口链路的两种协议中选择延迟最低的节点，不会跨模式改变出口。
 
 ## Shadowrocket（macOS / iOS）
 
@@ -114,9 +110,9 @@ python3 ./apply_clash_template.py
 当前桌面订阅节点命名按链路优先：
 
 ```text
-yuntu-aaitr-reality / yuntu-aaitr-hy2 / yuntu-aaitr-anytls / yuntu-aaitr-ss
-yuntu-exit-reality  / yuntu-exit-hy2  / yuntu-exit-anytls  / yuntu-exit-ss
-aaitr-exit-reality  / aaitr-exit-hy2  / aaitr-exit-anytls  / aaitr-exit-ss
+yuntu-aaitr-reality / yuntu-aaitr-hy2
+yuntu-exit-reality  / yuntu-exit-hy2
+aaitr-exit-reality  / aaitr-exit-hy2
 ```
 
 刷新入站地址布局：
@@ -145,13 +141,13 @@ systemctl status yuntu-exit-sync.timer --no-pager
 journalctl -u yuntu-exit-sync.service -n 50 --no-pager
 ```
 
-s-ui 会立即为新用户生成订阅；timer 负责在约一分钟内规范化三条链路的节点名称，并把 `aaitr-production` 用户的 Reality、Hysteria2、AnyTLS 和 Shadowsocks 2022 认证同步到 YunTu exit。`yuntu-exit-sync-*` 是单次同步使用的临时工作目录，正常结束会自动删除，不是用户数据目录。
+s-ui 会立即为新用户生成订阅；timer 负责在约一分钟内规范化三条链路的节点名称，并把 `aaitr-production` 用户的 Reality、Hysteria2 认证同步到 YunTu exit。`yuntu-exit-sync-*` 是单次同步使用的临时工作目录，正常结束会自动删除，不是用户数据目录。
 
 同步流程：
 
-1. 通过 s-ui 原生接口统一 `aaitr-production` 用户的四种协议权限，使运行中的核心立即热更新。
-2. 将新用户的 12 个 raw 节点名称规范为三条链路的固定命名。
-3. 渲染 YunTu Reality / Hysteria2 / AnyTLS / Shadowsocks 2022 直接出口配置。
+1. 通过 s-ui 原生接口统一 `aaitr-production` 用户的两种协议权限，使运行中的核心立即热更新。
+2. 将新用户的 6 个 raw 节点名称规范为三条链路的固定命名。
+3. 渲染 YunTu Reality / Hysteria2 直接出口配置。
 4. SSH 推送到 YunTu 临时文件。
 5. 在 YunTu 上用 sing-box 校验。
 6. 只有配置 hash 变化时才替换配置并重启 `yuntu-exit`。
@@ -179,7 +175,6 @@ python3 ./verify_s_ui.py subscriptions
 python3 ./verify_s_ui.py protocols
 python3 ./verify_s_ui.py proxies
 python3 ./verify_s_ui.py shadowrocket
-python3 ./verify_ss_egress.py
 ```
 
 验证脚本不会打印完整订阅链接、UUID、密码或节点 URI。

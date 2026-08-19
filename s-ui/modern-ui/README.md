@@ -6,7 +6,7 @@
 
 - s-ui 原生会话登录、资源与核心状态总览。
 - 用户搜索、筛选、新建、编辑、启停、删除与订阅复制。
-- Reality、Hysteria2、AnyTLS、Shadowsocks 2022、SOCKS5、HTTP、HTTPS 入口状态。
+- Reality、Hysteria2 和直连 SOCKS5 入口状态。
 - 日志查看、核心重启、数据库备份和 sing-box 配置导出。
 - 高风险入站、TLS、路由和数据库操作继续使用 `/app/` 原面板。
 

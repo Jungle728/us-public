@@ -6,7 +6,7 @@
 
 | 目录 | 内容 | 是否进入 GitHub |
 |---|---|---|
-| `/root/code/us-public/s-ui` | s-ui 管理源、四种桌面协议、订阅与同步脚本 | 代码与模板进入，运行数据排除 |
+| `/root/code/us-public/s-ui` | s-ui 管理源、两种桌面协议、订阅与同步脚本 | 代码与模板进入，运行数据排除 |
 | `/root/code/us-public/s-ui-edge` | Nginx/Certbot 边缘入口 | 配置模板进入，证书目录排除 |
 | `/root/code/us-public/yuntu-line` | YunTu 线路机公开编排模板 | 进入 |
 | `/root/code/us-public/migration/` | 当前 AaITR、YunTu 的受限迁移归档 | 不进入 |
@@ -19,7 +19,7 @@ client -> YunTu -> internet
 client -> AaITR -> internet
 ```
 
-每条链路提供 VLESS Reality、Hysteria2、AnyTLS 和 Shadowsocks 2022。SOCKS5、HTTP、HTTPS 是独立的服务器转发代理，不进入桌面节点订阅。
+每条链路提供 VLESS Reality 和 Hysteria2。SOCKS5 是直连 AaITR 的独立服务器转发代理，不进入桌面节点订阅。
 
 ## 更换机器时
 
@@ -28,7 +28,7 @@ client -> AaITR -> internet
 3. 从 GitHub 部署公开模板，再恢复对应机器的运行归档。
 4. 更新模板中的线路机和落地机地址、DNS、证书和防火墙端口。
 5. 先运行配置检查，再启动服务；最后运行 `python3 ./verify_s_ui.py all` 和 YunTu 的 Compose 校验。
-6. DNS 切换完成并确认订阅、四种协议和三个出口均正常后，再释放旧机器。
+6. DNS 切换完成并确认订阅、两种协议和三个出口均正常后，再释放旧机器。
 
 ## 运行归档保护
 

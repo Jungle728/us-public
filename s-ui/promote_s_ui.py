@@ -28,35 +28,11 @@ PROFILES = {
         "listen_port": 32443,
         "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 443, "remark": "-hy2"}],
     },
-    "canary-anytls": {
-        "tag": "yuntu-anytls",
-        "listen": "0.0.0.0",
-        "listen_port": 33443,
-        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 8443, "remark": "-anytls"}],
-    },
-    "canary-shadowsocks": {
-        "tag": "yuntu-shadowsocks",
-        "listen": "0.0.0.0",
-        "listen_port": 34443,
-        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 10443, "remark": "-ss"}],
-    },
     "canary-socks5": {
-        "tag": "yuntu-socks5",
+        "tag": "aaitr-socks5",
         "listen": "0.0.0.0",
-        "listen_port": 31080,
-        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 1080, "remark": "-socks5"}],
-    },
-    "canary-http": {
-        "tag": "yuntu-http",
-        "listen": "0.0.0.0",
-        "listen_port": 31081,
-        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 8080, "remark": "-http"}],
-    },
-    "canary-https": {
-        "tag": "aaitr-https",
-        "listen": "127.0.0.1",
-        "listen_port": 31444,
-        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 443, "remark": "-https"}],
+        "listen_port": 1080,
+        "addrs": [{"server": "proxy.bigpandas.top", "server_port": 1080, "remark": "-socks5"}],
     },
 }
 

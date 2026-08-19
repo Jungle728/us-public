@@ -45,8 +45,6 @@ services:
     command:
       - -L
       - udp://:443/99.88.84.197:32443?keepalive=true&ttl=60s&readBufferSize=65535
-      - -L
-      - udp://:10443/99.88.84.197:34443?keepalive=true&ttl=60s&readBufferSize=65535
     security_opt:
       - no-new-privileges:true
     cap_drop:

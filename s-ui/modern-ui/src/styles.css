@@ -212,8 +212,6 @@ button:disabled { opacity: 0.55; cursor: wait; }
 .protocol-row { min-height: 66px; display: grid; grid-template-columns: 40px minmax(160px, 1fr) 100px minmax(160px, auto) 66px 70px; gap: 12px; align-items: center; border-top: 1px solid var(--line); }
 .protocol-glyph { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 5px; background: var(--blue-soft); color: var(--blue); font-size: 9px; font-weight: 850; }
 .protocol-glyph.hysteria2 { background: var(--amber-soft); color: var(--amber); }
-.protocol-glyph.anytls { background: var(--brand-soft); color: var(--brand); }
-.protocol-glyph.shadowsocks { background: var(--blue-soft); color: var(--blue); }
 .protocol-main { min-width: 0; display: grid; gap: 3px; }
 .protocol-main strong { font-size: 12px; }
 .protocol-main small { color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; }

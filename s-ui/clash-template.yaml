@@ -124,24 +124,18 @@ proxy-groups:
       - YUNTU-AAITR-AUTO
       - yuntu-aaitr-reality
       - yuntu-aaitr-hy2
-      - yuntu-aaitr-anytls
-      - yuntu-aaitr-ss
   - name: YUNTU-EXIT
     type: select
     proxies:
       - YUNTU-EXIT-AUTO
       - yuntu-exit-reality
       - yuntu-exit-hy2
-      - yuntu-exit-anytls
-      - yuntu-exit-ss
   - name: AAITR-EXIT
     type: select
     proxies:
       - AAITR-EXIT-AUTO
       - aaitr-exit-reality
       - aaitr-exit-hy2
-      - aaitr-exit-anytls
-      - aaitr-exit-ss
   - name: YUNTU-AAITR-AUTO
     type: url-test
     include-all-proxies: true

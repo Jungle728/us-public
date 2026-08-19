@@ -5,7 +5,7 @@
 ## 职责
 
 - TCP 80：ACME HTTP-01 验证和 HTTP 到 HTTPS 跳转。
-- TCP 443：按 SNI 分流 Reality、HTTPS 代理、面板和订阅。
+- TCP 443：按 SNI 分流 Reality、面板和订阅。
 - `panel.bigpandas.top`：反向代理到 s-ui 面板。
 - `panel.bigpandas.top/modern/`：由 Nginx 直接提供轻量现代控制台，根路径默认跳转至此。
 - `panel.bigpandas.top/app/`：保留原 s-ui 面板，用于协议、TLS 和底层配置。
@@ -47,4 +47,4 @@ docker compose exec -T nginx nginx -s reload
 
 证书续期每 12 小时检查一次。Nginx 容器每 5 分钟检查证书 mtime；如果证书变化，会先运行 `nginx -t`，成功后热重载。
 
-s-ui 内置 sing-box core 同时 watch 证书文件，Hysteria2 和 AnyTLS 可随证书续期原地刷新。
+s-ui 内置 sing-box core 同时 watch 证书文件，Hysteria2 可随证书续期原地刷新。

@@ -161,10 +161,6 @@ def password() -> str:
     return secrets.token_hex(16)
 
 
-def shadowsocks_key() -> str:
-    return base64.b64encode(secrets.token_bytes(16)).decode()
-
-
 class SUI:
     def __init__(self) -> None:
         self.jar = CookieJar()
@@ -323,8 +319,6 @@ def client_payload(item: dict) -> dict:
         "config": {
             "vless": {"name": user, "uuid": item["uuid"], "flow": item["flow"]},
             "hysteria2": {"name": user, "password": password()},
-            "anytls": {"name": user, "password": password()},
-            "shadowsocks16": {"name": user, "password": shadowsocks_key()},
         },
         "inbounds": [],
         "links": [],
@@ -347,7 +341,6 @@ def proxy_client_payload(item: dict) -> dict:
         "name": item["name"],
         "config": {
             "socks": {"username": item["name"], "password": item["password"]},
-            "http": {"username": item["name"], "password": item["password"]},
         },
         "inbounds": [],
         "links": [],
@@ -390,67 +383,12 @@ def inbound_payloads(tls_ids: dict) -> list[dict]:
         },
         {
             "id": 0,
-            "type": "anytls",
-            "tag": "canary-anytls",
-            "listen": "0.0.0.0",
-            "listen_port": 33443,
-            "tls_id": tls_ids["canary-tls"],
-            "padding_scheme": [
-                "stop=8",
-                "0=30-30",
-                "1=100-400",
-                "2=400-500,c,500-1000,c,500-1000,c,500-1000,c,500-1000",
-                "3=9-9,500-1000",
-                "4=500-1000",
-                "5=500-1000",
-                "6=500-1000",
-                "7=500-1000",
-            ],
-            "addrs": [{"server": PUBLIC_HOST, "server_port": 33443, "remark": "yuntu-canary"}],
-            "out_json": {},
-        },
-        {
-            "id": 0,
-            "type": "shadowsocks",
-            "tag": "canary-shadowsocks",
-            "listen": "0.0.0.0",
-            "listen_port": 34443,
-            "method": "2022-blake3-aes-128-gcm",
-            "password": shadowsocks_key(),
-            "managed": False,
-            "multiplex": {},
-            "tls_id": 0,
-            "addrs": [{"server": PUBLIC_HOST, "server_port": 34443, "remark": "yuntu-canary"}],
-            "out_json": {},
-        },
-        {
-            "id": 0,
             "type": "socks",
             "tag": "canary-socks5",
-            "listen": "127.0.0.1",
-            "listen_port": 31080,
+            "listen": "0.0.0.0",
+            "listen_port": 1080,
             "tls_id": 0,
-            "addrs": [{"server": PUBLIC_HOST, "server_port": 31080, "remark": "yuntu-canary"}],
-            "out_json": {},
-        },
-        {
-            "id": 0,
-            "type": "http",
-            "tag": "canary-http",
-            "listen": "127.0.0.1",
-            "listen_port": 31081,
-            "tls_id": 0,
-            "addrs": [{"server": PUBLIC_HOST, "server_port": 31081, "remark": "yuntu-canary"}],
-            "out_json": {},
-        },
-        {
-            "id": 0,
-            "type": "http",
-            "tag": "canary-https",
-            "listen": "127.0.0.1",
-            "listen_port": 31444,
-            "tls_id": tls_ids["canary-tls"],
-            "addrs": [{"server": PUBLIC_HOST, "server_port": 31444, "remark": "yuntu-canary"}],
+            "addrs": [{"server": "proxy.bigpandas.top", "server_port": 1080, "remark": "-socks5"}],
             "out_json": {},
         },
     ]
@@ -486,8 +424,8 @@ def subscription_links(client_name: str) -> dict[str, str]:
 
 
 def verify_subscriptions(source: dict) -> None:
-    expected_links = {"vless", "hysteria2", "anytls", "ss"}
-    expected_json = {"vless", "hysteria2", "anytls", "shadowsocks"}
+    expected_links = {"vless", "hysteria2"}
+    expected_json = {"vless", "hysteria2"}
     for item in source["clients"]:
         raw = fetch_subscription(item["name"])
         decoded = raw
@@ -517,7 +455,7 @@ def verify_subscriptions(source: dict) -> None:
             )
 
         clash = fetch_subscription(item["name"], "clash")
-        for protocol in ("vless", "hysteria2", "anytls", "ss"):
+        for protocol in ("vless", "hysteria2"):
             if f"type: {protocol}" not in clash:
                 fail(f"Clash subscription is missing protocol: {protocol}")
     print(f"verified subscriptions: {len(source['clients'])}")
@@ -528,13 +466,7 @@ def verify_protocols(source: dict) -> None:
     """Perform real outbound checks through every main subscription protocol."""
     sui = SUI()
     sui.login()
-    protocol_aliases = {
-        "vless": "vless",
-        "hysteria2": "hysteria2",
-        "hy2": "hysteria2",
-        "anytls": "anytls",
-        "ss": "shadowsocks",
-    }
+    protocol_aliases = {"vless": "vless", "hysteria2": "hysteria2", "hy2": "hysteria2"}
     checks = []
     for client in source["clients"]:
         links = subscription_links(client["name"])
@@ -544,7 +476,7 @@ def verify_protocols(source: dict) -> None:
                 checks.append((client["name"], protocol, links[scheme]))
                 found.add(protocol)
         present = {protocol_aliases[s] for s in links if s in protocol_aliases}
-        missing = {"vless", "hysteria2", "anytls", "shadowsocks"} - present
+        missing = {"vless", "hysteria2"} - present
         if missing:
             fail(f"subscription is missing protocol links: {sorted(missing)}")
 
@@ -569,10 +501,10 @@ def verify_protocols(source: dict) -> None:
                 sui.delete_outbound(tag)
             except Exception as exc:  # noqa: BLE001
                 fail(f"unable to remove temporary outbound: {type(exc).__name__}")
-    expected = len(source["clients"]) * 4
+    expected = len(source["clients"]) * 2
     if verified != expected:
         fail(f"verified {verified} protocol outbounds, expected {expected}")
-    print("VLESS Reality, Hysteria2, AnyTLS, and Shadowsocks real outbound checks: complete")
+    print("VLESS Reality and Hysteria2 real outbound checks: complete")
 
 
 def verify_forward_proxies(source: dict) -> None:
@@ -580,19 +512,7 @@ def verify_forward_proxies(source: dict) -> None:
     checks = {
         "socks5": [
             "curl", "-4fsS", "--max-time", "20",
-            "--socks5-hostname", "127.0.0.1:31080",
-            "--proxy-user", credential,
-            "https://api.ipify.org",
-        ],
-        "http": [
-            "curl", "-4fsS", "--max-time", "20",
-            "--proxy", "http://127.0.0.1:31081",
-            "--proxy-user", credential,
-            "https://api.ipify.org",
-        ],
-        "https": [
-            "curl", "-4fsS", "--max-time", "20",
-            "--proxy", f"https://{TLS_SNI}:443",
+            "--socks5-hostname", "127.0.0.1:1080",
             "--proxy-user", credential,
             "https://api.ipify.org",
         ],
@@ -603,7 +523,7 @@ def verify_forward_proxies(source: dict) -> None:
             fail(f"{name} proxy test failed with curl exit {result.returncode}")
         if result.stdout.strip() != "99.88.84.197":
             fail(f"{name} proxy egress did not match the AaITR IPv4 address")
-    print("verified forward proxies: SOCKS5, HTTP, HTTPS")
+    print("verified forward proxy: direct AaITR SOCKS5")
     print("forward proxy egress: AaITR IPv4")
 
 
@@ -618,7 +538,7 @@ def main() -> int:
     source = load_source()
     print(f"source VLESS REALITY inbound: 1 (id hidden)")
     print(f"source clients: {len(source['clients'])}")
-    print(f"protocols to create: VLESS/REALITY, Hysteria2, AnyTLS, SOCKS5, HTTP, HTTPS")
+    print("protocols to create: VLESS/REALITY, Hysteria2, direct SOCKS5")
     if args.verify:
         verify_subscriptions(source)
         return 0
@@ -676,25 +596,13 @@ def main() -> int:
     for inbound in inbound_payloads(tls_ids):
         if inbound["tag"] in existing_inbounds:
             continue
-        init_ids = (
-            client_ids
-            if inbound["tag"] in {"canary-reality", "canary-hysteria2", "canary-anytls", "canary-shadowsocks"}
-            else [proxy_id]
-        )
+        init_ids = client_ids if inbound["tag"] in {"canary-reality", "canary-hysteria2"} else [proxy_id]
         sui.save("inbounds", inbound, ",".join(str(x) for x in init_ids))
 
     current_inbounds = {x.get("tag"): x for x in (sui.get("inbounds") or [])}
-    core_ids = [
-        int(current_inbounds[tag]["id"])
-        for tag in ("canary-reality", "canary-hysteria2", "canary-anytls", "canary-shadowsocks")
-    ]
-    proxy_ids = [
-        int(current_inbounds[tag]["id"])
-        for tag in ("canary-socks5", "canary-http", "canary-https")
-    ]
+    core_ids = [int(current_inbounds[tag]["id"]) for tag in ("canary-reality", "canary-hysteria2")]
+    proxy_ids = [int(current_inbounds["canary-socks5"]["id"])]
 
-    # Remove proxy protocols from the three subscription clients, and keep the
-    # existing HTTP proxy credential on a separate client.
     for source_client in source["clients"]:
         client_id = int(current_clients[source_client["name"]]["id"])
         full = (sui.get("clients", {"id": client_id}) or [None])[0]
@@ -702,8 +610,8 @@ def main() -> int:
             fail("unable to load a migrated client for reconciliation")
         full["inbounds"] = core_ids
         if isinstance(full.get("config"), dict):
-            full["config"].pop("socks", None)
-            full["config"].pop("http", None)
+            for key in ("socks", "http", "mixed", "shadowsocks", "shadowsocks16", "anytls"):
+                full["config"].pop(key, None)
         sui.save("clients", full, action="edit")
 
     proxy_full = (sui.get("clients", {"id": proxy_id}) or [None])[0]

@@ -25,14 +25,8 @@ DISPLAY_NAMES = {
     "aaitr-exit-reality",
     "yuntu-aaitr-hy2",
     "aaitr-exit-hy2",
-    "yuntu-aaitr-anytls",
-    "aaitr-exit-anytls",
     "yuntu-exit-reality",
     "yuntu-exit-hy2",
-    "yuntu-exit-anytls",
-    "yuntu-aaitr-ss",
-    "aaitr-exit-ss",
-    "yuntu-exit-ss",
 }
 
 
@@ -194,7 +188,7 @@ def link_route_marker(link: str) -> str:
     port = parsed.port
     if hostname == "proxy.bigpandas.top":
         return "aaitr-exit"
-    if hostname == "yuntu.bigpandas.top" and port in {1443, 2443, 9443, 10444}:
+    if hostname == "yuntu.bigpandas.top" and port in {1443, 2443}:
         return "yuntu-exit"
     if hostname == "yuntu.bigpandas.top":
         return "yuntu-aaitr"
@@ -370,22 +364,16 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
             "YUNTU-AAITR-AUTO",
             "yuntu-aaitr-reality",
             "yuntu-aaitr-hy2",
-            "yuntu-aaitr-anytls",
-            "yuntu-aaitr-ss",
         ),
         "YUNTU-EXIT": (
             "YUNTU-EXIT-AUTO",
             "yuntu-exit-reality",
             "yuntu-exit-hy2",
-            "yuntu-exit-anytls",
-            "yuntu-exit-ss",
         ),
         "AAITR-EXIT": (
             "AAITR-EXIT-AUTO",
             "aaitr-exit-reality",
             "aaitr-exit-hy2",
-            "aaitr-exit-anytls",
-            "aaitr-exit-ss",
         ),
     }
     for group, members in manual_groups.items():
@@ -394,21 +382,21 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
 
 
 def verify_subscriptions(source: dict) -> None:
-    raw_expected = {"vless", "hysteria2", "anytls", "ss"}
-    json_expected = {"vless", "hysteria2", "anytls", "shadowsocks"}
-    clash_expected = {"vless", "hysteria2", "anytls", "ss"}
+    raw_expected = {"vless", "hysteria2"}
+    json_expected = {"vless", "hysteria2"}
+    clash_expected = {"vless", "hysteria2"}
     for item in source["clients"]:
         link_lines = subscription_link_lines(item["name"])
         schemes = [line.split("://", 1)[0].lower() for line in link_lines]
         missing = raw_expected - set(schemes)
         if missing:
             fail(f"raw subscription is missing protocols: {sorted(missing)}")
-        if len(link_lines) != 12:
-            fail(f"raw subscription should contain 12 desktop links, found {len(link_lines)}")
+        if len(link_lines) != 6:
+            fail(f"raw subscription should contain 6 desktop links, found {len(link_lines)}")
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
             count = sum(link_route_marker(line) == marker for line in link_lines)
-            if count != 4:
-                fail(f"raw subscription should contain 4 {marker} links, found {count}")
+            if count != 2:
+                fail(f"raw subscription should contain 2 {marker} links, found {count}")
         display_names = {link_display_name(line) for line in link_lines}
         if display_names != DISPLAY_NAMES:
             fail(f"raw subscription display names are unexpected: {sorted(display_names)}")
@@ -427,21 +415,19 @@ def verify_subscriptions(source: dict) -> None:
         missing = json_expected - outbound_types
         if missing:
             fail(f"JSON subscription is missing protocols: {sorted(missing)}")
-        if len(outbounds) != 12:
-            fail(f"JSON subscription should contain 12 desktop outbounds, found {len(outbounds)}")
+        if len(outbounds) != 6:
+            fail(f"JSON subscription should contain 6 desktop outbounds, found {len(outbounds)}")
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
             count = sum(marker in str(outbound.get("tag", "")) for outbound in outbounds)
-            if count != 4:
-                fail(f"JSON subscription should contain 4 {marker} outbounds, found {count}")
+            if count != 2:
+                fail(f"JSON subscription should contain 2 {marker} outbounds, found {count}")
 
         clash = fetch_subscription(item["name"], "clash")
         for protocol in clash_expected:
             if f"type: {protocol}" not in clash:
                 fail(f"Clash subscription is missing protocol: {protocol}")
-        if clash.count("type: ss\n      udp: true") != 3:
-            fail("Clash subscription should expose UDP on all three Shadowsocks nodes")
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
-            if clash.count(marker) < 4:
+            if clash.count(marker) < 2:
                 fail(f"Clash subscription is missing {marker} nodes")
         for protocol in ("socks5", "socks", "http"):
             if f"type: {protocol}" in clash:
@@ -458,8 +444,6 @@ def verify_protocols(source: dict) -> None:
         "vless": "vless",
         "hysteria2": "hysteria2",
         "hy2": "hysteria2",
-        "anytls": "anytls",
-        "ss": "shadowsocks",
     }
     checks = []
     for client in source["clients"]:
@@ -476,7 +460,7 @@ def verify_protocols(source: dict) -> None:
         for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
             missing = {
                 protocol
-                for protocol in ("vless", "hysteria2", "anytls", "shadowsocks")
+                for protocol in ("vless", "hysteria2")
                 if (protocol, marker) not in found
             }
             if missing:
@@ -500,10 +484,10 @@ def verify_protocols(source: dict) -> None:
                 sui.delete_outbound(tag)
             except Exception as exc:  # noqa: BLE001
                 fail(f"unable to remove temporary outbound: {type(exc).__name__}")
-    expected = len(source["clients"]) * 12
+    expected = len(source["clients"]) * 6
     if verified != expected:
         fail(f"verified {verified} protocol outbounds, expected {expected}")
-    print("VLESS Reality, Hysteria2, AnyTLS, and Shadowsocks real outbound checks: complete")
+    print("VLESS Reality and Hysteria2 real outbound checks: complete")
 
 
 def verify_forward_proxies(source: dict) -> None:
@@ -511,17 +495,7 @@ def verify_forward_proxies(source: dict) -> None:
     checks = {
         "socks5": [
             "curl", "-4fsS", "--max-time", "20",
-            "--socks5-hostname", "127.0.0.1:31080",
-            "--proxy-user", credential, "https://api.ipify.org",
-        ],
-        "http": [
-            "curl", "-4fsS", "--max-time", "20",
-            "--proxy", "http://127.0.0.1:31081",
-            "--proxy-user", credential, "https://api.ipify.org",
-        ],
-        "https": [
-            "curl", "-4fsS", "--max-time", "20",
-            "--proxy", f"https://{TLS_SNI}:443",
+            "--socks5-hostname", "127.0.0.1:1080",
             "--proxy-user", credential, "https://api.ipify.org",
         ],
     }
@@ -531,5 +505,5 @@ def verify_forward_proxies(source: dict) -> None:
             fail(f"{name} proxy test failed with curl exit {result.returncode}")
         if result.stdout.strip() != AAITR_IPV4:
             fail(f"{name} proxy egress did not match the AaITR IPv4 address")
-    print("verified forward proxies: SOCKS5, HTTP, HTTPS")
+    print("verified forward proxy: direct AaITR SOCKS5")
     print("forward proxy egress: AaITR IPv4")

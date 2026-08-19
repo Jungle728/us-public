@@ -40,12 +40,12 @@ def production_state() -> dict:
     if len(rows) != 1:
         raise RuntimeError("unable to load the forward proxy client")
     config = rows[0].get("config") or {}
-    http = config.get("http") or {}
-    if not http.get("username") or not http.get("password"):
-        raise RuntimeError("forward proxy credentials are incomplete")
+    socks = config.get("socks") or {}
+    if not socks.get("username") or not socks.get("password"):
+        raise RuntimeError("forward proxy SOCKS5 credentials are incomplete")
     return {
         "clients": clients,
-        "proxy": {"name": http["username"], "password": http["password"]},
+        "proxy": {"name": socks["username"], "password": socks["password"]},
     }
 
 

@@ -169,7 +169,7 @@ function renderLogin(error = ""): void {
           <div class="status-orbit"><i data-lucide="route"></i></div>
           <p>线路管理</p>
           <strong>YunTu <span>→</span> AaITR</strong>
-          <div class="login-tags"><span>Reality</span><span>Hysteria2</span><span>AnyTLS</span></div>
+          <div class="login-tags"><span>Reality</span><span>Hysteria2</span></div>
         </div>
         <small>Private operations surface</small>
       </section>
@@ -283,7 +283,7 @@ function renderDashboard(): string {
     </section>
     <section class="dashboard-grid">
       <article class="panel route-panel">
-        <div class="section-head"><div><span class="eyebrow">Traffic routes</span><h2>三种出口模式</h2></div><span class="quiet-badge">${panel.inbounds.filter((item) => ["vless", "hysteria2", "anytls", "shadowsocks"].includes(item.type)).length} 个协议入口</span></div>
+        <div class="section-head"><div><span class="eyebrow">Traffic routes</span><h2>三种出口模式</h2></div><span class="quiet-badge">${panel.inbounds.filter((item) => ["vless", "hysteria2"].includes(item.type)).length} 个协议入口</span></div>
         <div class="route-list">
           ${routeRow("YUN", "YunTu → AaITR", "家宽出口", "默认", "route-blue")}
           ${routeRow("YT", "YunTu Exit", "机房出口", "备用", "route-amber")}
@@ -357,12 +357,12 @@ function renderClientRow(client: Client): string {
 
 function renderInbounds(): string {
   if (!panel) return "";
-  const encrypted = panel.inbounds.filter((item) => ["vless", "hysteria2", "anytls", "shadowsocks"].includes(item.type));
-  const forwards = panel.inbounds.filter((item) => !["vless", "hysteria2", "anytls", "shadowsocks"].includes(item.type));
+  const encrypted = panel.inbounds.filter((item) => ["vless", "hysteria2"].includes(item.type));
+  const forwards = panel.inbounds.filter((item) => !["vless", "hysteria2"].includes(item.type));
   return `
     <section class="protocol-summary">
-      ${metricCard("shield-check", "加密协议", `${encrypted.length}`, "Reality · Hysteria2 · AnyTLS · SS2022")}
-      ${metricCard("route", "转发入口", `${forwards.length}`, "SOCKS5 · HTTP · HTTPS")}
+      ${metricCard("shield-check", "加密协议", `${encrypted.length}`, "Reality · Hysteria2")}
+      ${metricCard("route", "转发入口", `${forwards.length}`, "直连 SOCKS5")}
       ${metricCard("users", "已分配", `${new Set(panel.inbounds.flatMap((item) => item.users || [])).size}`, "去重后的入口用户")}
     </section>
     <section class="panel protocol-panel">
@@ -459,23 +459,12 @@ function randomSequence(length = 16): string {
   return Array.from(values, (value) => chars[value % chars.length]).join("");
 }
 
-function randomBase64Key(length = 16): string {
-  const values = crypto.getRandomValues(new Uint8Array(length));
-  let binary = "";
-  values.forEach((value) => { binary += String.fromCharCode(value); });
-  return btoa(binary);
-}
-
 function randomConfigs(name: string): ClientConfig {
   const password = randomSequence();
   const uuid = crypto.randomUUID();
   return {
-    mixed: { username: name, password }, socks: { username: name, password }, http: { username: name, password },
-    shadowsocks: { name, password: randomSequence(32) }, shadowsocks16: { name, password: randomBase64Key(16) },
-    shadowtls: { name, password: randomSequence(32) }, vmess: { name, uuid, alterId: 0 },
-    vless: { name, uuid, flow: "xtls-rprx-vision" }, anytls: { name, password }, trojan: { name, password },
-    naive: { username: name, password }, hysteria: { name, auth_str: password },
-    tuic: { name, uuid, password }, hysteria2: { name, password },
+    vless: { name, uuid, flow: "xtls-rprx-vision" },
+    hysteria2: { name, password },
   };
 }
 
@@ -489,7 +478,7 @@ function syncConfigIdentity(config: ClientConfig, name: string): ClientConfig {
 
 async function openClientModal(id?: number): Promise<void> {
   if (!panel) return;
-  const subscriptionInboundTypes = new Set(["vless", "hysteria2", "anytls", "shadowsocks"]);
+  const subscriptionInboundTypes = new Set(["vless", "hysteria2"]);
   let client: Client = {
     enable: true, name: "", config: {}, inbounds: panel.inbounds.filter((item) => subscriptionInboundTypes.has(item.type)).map((item) => item.id), links: [], volume: 0,
     expiry: 0, up: 0, down: 0, desc: "", group: "aaitr-production", remark: "", delayStart: false,

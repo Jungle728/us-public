@@ -57,55 +57,13 @@ DESKTOP_ADDRS = {
             "server_port": 2443,
         },
     ],
-    "yuntu-anytls": [
-        {
-            "name": "yuntu-aaitr-anytls",
-            "remark": "-yuntu-aaitr",
-            "server": "yuntu.bigpandas.top",
-            "server_port": 8443,
-        },
-        {
-            "name": "aaitr-exit-anytls",
-            "remark": "-aaitr-exit",
-            "server": "proxy.bigpandas.top",
-            "server_port": 33443,
-        },
-        {
-            "name": "yuntu-exit-anytls",
-            "remark": "-yuntu-exit",
-            "server": "yuntu.bigpandas.top",
-            "server_port": 9443,
-        },
-    ],
-    "yuntu-shadowsocks": [
-        {
-            "name": "yuntu-aaitr-ss",
-            "remark": "-yuntu-aaitr",
-            "server": "yuntu.bigpandas.top",
-            "server_port": 10443,
-        },
-        {
-            "name": "aaitr-exit-ss",
-            "remark": "-aaitr-exit",
-            "server": "proxy.bigpandas.top",
-            "server_port": 34443,
-        },
-        {
-            "name": "yuntu-exit-ss",
-            "remark": "-yuntu-exit",
-            "server": "yuntu.bigpandas.top",
-            "server_port": 10444,
-        },
-    ],
 }
 
-FORWARD_PROXY_TAGS = {"yuntu-socks5", "yuntu-http", "aaitr-https"}
+FORWARD_PROXY_TAGS = {"aaitr-socks5"}
 
 SCHEME_TAGS = {
     "vless": "yuntu-reality",
     "hysteria2": "yuntu-hysteria2",
-    "anytls": "yuntu-anytls",
-    "ss": "yuntu-shadowsocks",
 }
 
 
