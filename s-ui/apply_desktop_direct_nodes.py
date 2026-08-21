@@ -74,12 +74,27 @@ def retarget_uri(uri: str, server: str, port: int, name: str) -> str:
     credential = parts.netloc.rsplit("@", 1)[0]
     if parts.scheme not in SCHEME_TAGS:
         fail(f"unexpected desktop URI scheme: {parts.scheme}")
+    query = parts.query
+    if parts.scheme == "hysteria2":
+        parameters = urllib.parse.parse_qsl(query, keep_blank_values=True)
+        sni_keys = {"sni", "peer", "server_name"}
+        replaced = False
+        normalized = []
+        for key, value in parameters:
+            if key.lower() in sni_keys:
+                normalized.append((key, server))
+                replaced = True
+            else:
+                normalized.append((key, value))
+        if not replaced:
+            normalized.append(("sni", server))
+        query = urllib.parse.urlencode(normalized)
     return urllib.parse.urlunsplit(
         (
             parts.scheme,
             f"{credential}@{server}:{port}",
             parts.path,
-            parts.query,
+            query,
             name,
         )
     )
