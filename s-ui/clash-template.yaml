@@ -115,41 +115,41 @@ proxy-groups:
   - name: EXIT-MODE
     type: select
     proxies:
-      - YUNTU-AAITR
-      - YUNTU-EXIT
+      - CSTONECLOUD-AAITR
+      - CSTONECLOUD-EXIT
       - AAITR-EXIT
-  - name: YUNTU-AAITR
+  - name: CSTONECLOUD-AAITR
     type: select
     proxies:
-      - YUNTU-AAITR-AUTO
-      - yuntu-aaitr-reality
-      - yuntu-aaitr-hy2
-  - name: YUNTU-EXIT
+      - CSTONECLOUD-AAITR-AUTO
+      - cstonecloud-aaitr-reality
+      - cstonecloud-aaitr-hy2
+  - name: CSTONECLOUD-EXIT
     type: select
     proxies:
-      - YUNTU-EXIT-AUTO
-      - yuntu-exit-reality
-      - yuntu-exit-hy2
+      - CSTONECLOUD-EXIT-AUTO
+      - cstonecloud-exit-reality
+      - cstonecloud-exit-hy2
   - name: AAITR-EXIT
     type: select
     proxies:
       - AAITR-EXIT-AUTO
       - aaitr-exit-reality
       - aaitr-exit-hy2
-  - name: YUNTU-AAITR-AUTO
+  - name: CSTONECLOUD-AAITR-AUTO
     type: url-test
     include-all-proxies: true
-    filter: ^yuntu-aaitr-
+    filter: ^cstonecloud-aaitr-
     url: https://cp.cloudflare.com/generate_204
     interval: 300
     timeout: 5000
     tolerance: 50
     lazy: true
     expected-status: 204
-  - name: YUNTU-EXIT-AUTO
+  - name: CSTONECLOUD-EXIT-AUTO
     type: url-test
     include-all-proxies: true
-    filter: ^yuntu-exit-
+    filter: ^cstonecloud-exit-
     url: https://cp.cloudflare.com/generate_204
     interval: 300
     timeout: 5000

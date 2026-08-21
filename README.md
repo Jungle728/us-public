@@ -1,16 +1,16 @@
-# AaITR + YunTu 代理基础设施
+# AaITR + CStoneCloud 代理基础设施
 
 这个仓库整理了两台机器上的公开部署模板和运维说明：
 
 - **AaITR 落地机**：运行 s-ui、订阅服务、HTTPS/SNI 边缘入口和 AaITR 家宽出口。
-- **YunTu 线路机**：作为 Reality/Hysteria2 的入口中转，以及可选的 YunTu 机房出口。
+- **CStoneCloud 线路机**：作为 Reality/Hysteria2 的入口中转，以及可选的 CStoneCloud 机房出口。
 
 当前生产主机：
 
 | 角色 | 主机 | 节点域名 |
 |---|---|---|
 | AaITR | `47.178.15.216` | `verizon.bigpandas.top` |
-| YunTu | `70.39.179.159` | `cstonecloud.bigpandas.top` |
+| CStoneCloud | `70.39.179.159` | `cstonecloud.bigpandas.top` |
 
 仓库只保存可公开的编排、模板、脚本和中文说明；运行数据库、面板密码、证书私钥、订阅凭据、客户端配置和备份都被 `.gitignore` 排除。
 
@@ -18,8 +18,8 @@
 
 ```text
 客户端
-  ├─ yuntu-aaitr-*  -> YunTu 线路机 -> AaITR 家宽落地 -> 目标网站
-  ├─ yuntu-exit-*   -> YunTu 线路机 -> 目标网站
+  ├─ cstonecloud-aaitr-*  -> CStoneCloud 线路机 -> AaITR 家宽落地 -> 目标网站
+  ├─ cstonecloud-exit-*   -> CStoneCloud 线路机 -> 目标网站
   └─ aaitr-exit-*   -> AaITR 家宽落地 -> 目标网站
 ```
 
@@ -27,8 +27,8 @@
 
 | 分组 | 链路 | 出口 IP 类型 | 推荐用途 |
 |---|---|---|---|
-| `YUNTU-AAITR` | 客户端 -> YunTu -> AaITR -> 互联网 | AaITR 家宽 | 默认主力，适合 Google、Gmail、Gemini、Claude、ChatGPT、Telegram 等 |
-| `YUNTU-EXIT` | 客户端 -> YunTu -> 互联网 | YunTu 机房 | 备用、下载、对 IP 质量不敏感的流量 |
+| `CSTONECLOUD-AAITR` | 客户端 -> CStoneCloud -> AaITR -> 互联网 | AaITR 家宽 | 默认主力，适合 Google、Gmail、Gemini、Claude、ChatGPT、Telegram 等 |
+| `CSTONECLOUD-EXIT` | 客户端 -> CStoneCloud -> 互联网 | CStoneCloud 机房 | 备用、下载、对 IP 质量不敏感的流量 |
 | `AAITR-EXIT` | 客户端 -> AaITR -> 互联网 | AaITR 家宽 | 直连 AaITR 备用与对照测试 |
 
 每个模式组默认使用对应的 `*-AUTO`，自动在 Reality 和 Hysteria2 两种协议中选择延迟最低的节点；需要排障或保持固定传输时，也可以在模式组内手动指定协议。
@@ -41,7 +41,7 @@ macOS 和 iOS 的 Shadowrocket 使用一份与节点订阅解耦的公共配置�
 3x-ui/          已停用的旧 3x-ui Docker 模板，仅作为迁移参考
 s-ui/           AaITR s-ui 主服务、订阅模板、同步脚本和验证脚本
 s-ui-edge/      AaITR Nginx/Certbot 边缘入口，负责 80/443、证书和订阅兼容路径
-yuntu-line/     YunTu 线路机 Docker 编排和 HAProxy/GOST/sing-box 说明
+yuntu-line/     CStoneCloud 线路机 Docker 编排（目录名为兼容旧部署而保留）
 workspace-activation/
                 独立静态/接口工具，保留为既有仓库内容
 ```
@@ -78,9 +78,9 @@ rules:
 AaITR 是管理源。新增或修改生产用户后：
 
 1. s-ui 立即生成订阅中两种协议的三条链路节点；直连 AaITR 的 SOCKS5 仅供服务器和 API 使用，不进入桌面订阅。
-2. `yuntu-exit-sync.timer` 每分钟轮询生产用户并渲染 YunTu exit 配置。
-3. 同步脚本通过 SSH 推送到 YunTu。
-4. YunTu 先用 sing-box 校验配置；只有配置 hash 变化时才重启 `yuntu-exit`。
+2. `yuntu-exit-sync.timer` 每分钟轮询生产用户并渲染 CStoneCloud exit 配置。
+3. 同步脚本通过 SSH 推送到 CStoneCloud。
+4. CStoneCloud 先用 sing-box 校验配置；只有配置 hash 变化时才重启兼容服务 `yuntu-exit`。
 
 安装或核对 timer：
 
@@ -99,7 +99,7 @@ python3 ./install_yuntu_exit_sync.py --check
 - s-ui SQLite 数据库与面板密码
 - 订阅 token、用户密码、UUID、Reality 私钥/short id
 - ACME 账号、证书私钥、`letsencrypt/`
-- YunTu 生成的 `yuntu-exit/config.json`
+- CStoneCloud 生成的 `yuntu-exit/config.json`
 - 运行备份、日志和本地测试产物
 
 提交前建议运行：
@@ -122,7 +122,7 @@ python3 ./verify_s_ui.py protocols
 python3 ./verify_s_ui.py proxies
 ```
 
-YunTu：
+CStoneCloud：
 
 ```bash
 cd /root/code/aaitr

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safely sync AaITR production clients to the YunTu pure-exit service."""
+"""Safely sync AaITR production clients to the CStoneCloud exit service."""
 
 from __future__ import annotations
 
@@ -206,11 +206,11 @@ def main() -> None:
                 current_remote_hash == local_hash
                 and current_remote_certificate_hash == local_certificate_hash
             ):
-                print("YunTu exit config and certificate already up to date")
+                print("CStoneCloud exit config and certificate already up to date")
                 return
             shutil.copy2(tmp_config, LOCAL_CONFIG)
             sync_remote(local_hash, local_certificate_hash)
-            print("YunTu exit config and certificate synced; yuntu-exit restarted")
+            print("CStoneCloud exit config and certificate synced; yuntu-exit restarted")
 
 
 if __name__ == "__main__":
@@ -219,5 +219,5 @@ if __name__ == "__main__":
     except BlockingIOError:
         print("another sync is already running")
     except Exception as exc:  # noqa: BLE001
-        print(f"YunTu exit sync failed: {exc}", file=sys.stderr)
+        print(f"CStoneCloud exit sync failed: {exc}", file=sys.stderr)
         raise SystemExit(1)

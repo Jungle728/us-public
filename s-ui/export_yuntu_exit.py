@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render the YunTu pure-exit sing-box config from the production s-ui DB."""
+"""Render the CStoneCloud pure-exit config using legacy yuntu-exit paths."""
 
 from __future__ import annotations
 
@@ -149,7 +149,7 @@ def main() -> None:
     args.output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     args.output.write_text(json.dumps(config, indent=2, sort_keys=False) + "\n")
     args.output.chmod(0o600)
-    print(f"rendered YunTu exit config: {len(clients)} production clients, 2 inbounds")
+    print(f"rendered CStoneCloud exit config: {len(clients)} production clients, 2 inbounds")
 
 
 if __name__ == "__main__":

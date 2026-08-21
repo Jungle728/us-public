@@ -1,15 +1,15 @@
-# YunTu 线路机
+# CStoneCloud 线路机
 
-该目录对应 YunTu 机器 `/root/code/aaitr` 的公开部署模板。YunTu 不是用户管理源，它只承担入口线路、中转和可选机房出口。
+该目录对应 CStoneCloud 机器 `/root/code/aaitr` 的公开部署模板。CStoneCloud 不是用户管理源，它只承担入口线路、中转和可选机房出口。目录名 `yuntu-line` 以及 `yuntu-exit` 容器名仅为兼容旧部署而保留。
 
-当前 YunTu 主机为 `70.39.179.159`（`cstonecloud.bigpandas.top`），中转目标
+当前 CStoneCloud 主机为 `70.39.179.159`（`cstonecloud.bigpandas.top`），中转目标
 AaITR 为 `47.178.15.216`（`verizon.bigpandas.top`）。
 
 ## 职责
 
 ```text
-客户端 -> YunTu -> AaITR -> 目标网站
-客户端 -> YunTu -> 目标网站
+客户端 -> CStoneCloud -> AaITR -> 目标网站
+客户端 -> CStoneCloud -> 目标网站
 ```
 
 公开监听：
@@ -18,8 +18,8 @@ AaITR 为 `47.178.15.216`（`verizon.bigpandas.top`）。
 |---|---|---|
 | TCP 443 | HAProxy TCP | Reality 中转到 AaITR |
 | UDP 443 | GOST UDP | Hysteria2 中转到 AaITR |
-| TCP 1443 | sing-box | YunTu Reality 直接出口 |
-| UDP 2443 | sing-box | YunTu Hysteria2 直接出口 |
+| TCP 1443 | sing-box | CStoneCloud Reality 直接出口 |
+| UDP 2443 | sing-box | CStoneCloud Hysteria2 直接出口 |
 
 ## 文件
 
@@ -56,6 +56,6 @@ docker compose run --rm --no-deps yuntu-exit check -c /etc/sing-box/config.json
 ## 与 AaITR 的关系
 
 - AaITR s-ui 是唯一用户管理源。
-- YunTu exit 配置由 AaITR 的 `sync_yuntu_exit.py` 生成并同步。
-- YunTu 上不保存面板密码和用户管理数据库。
-- 生产新增用户后通常不需要手动改 YunTu；等待 1 分钟同步即可。
+- CStoneCloud exit 配置由 AaITR 的兼容脚本 `sync_yuntu_exit.py` 生成并同步。
+- CStoneCloud 上不保存面板密码和用户管理数据库。
+- 生产新增用户后通常不需要手动改 CStoneCloud；等待 1 分钟同步即可。

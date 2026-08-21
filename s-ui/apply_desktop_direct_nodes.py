@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish desktop nodes for YunTu relay, YunTu exit, and AaITR exit paths."""
+"""Publish desktop nodes for CStoneCloud relay/exit and AaITR exit paths."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ BACKUPS = ROOT / "db" / "backups"
 DESKTOP_ADDRS = {
     "yuntu-reality": [
         {
-            "name": "yuntu-aaitr-reality",
-            "remark": "-yuntu-aaitr",
+            "name": "cstonecloud-aaitr-reality",
+            "remark": "-cstonecloud-aaitr",
             "server": "cstonecloud.bigpandas.top",
             "server_port": 443,
         },
@@ -31,16 +31,16 @@ DESKTOP_ADDRS = {
             "server_port": 443,
         },
         {
-            "name": "yuntu-exit-reality",
-            "remark": "-yuntu-exit",
+            "name": "cstonecloud-exit-reality",
+            "remark": "-cstonecloud-exit",
             "server": "cstonecloud.bigpandas.top",
             "server_port": 1443,
         },
     ],
     "yuntu-hysteria2": [
         {
-            "name": "yuntu-aaitr-hy2",
-            "remark": "-yuntu-aaitr",
+            "name": "cstonecloud-aaitr-hy2",
+            "remark": "-cstonecloud-aaitr",
             "server": "cstonecloud.bigpandas.top",
             "server_port": 443,
         },
@@ -51,8 +51,8 @@ DESKTOP_ADDRS = {
             "server_port": 32443,
         },
         {
-            "name": "yuntu-exit-hy2",
-            "remark": "-yuntu-exit",
+            "name": "cstonecloud-exit-hy2",
+            "remark": "-cstonecloud-exit",
             "server": "cstonecloud.bigpandas.top",
             "server_port": 2443,
         },

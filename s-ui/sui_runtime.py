@@ -21,12 +21,12 @@ TLS_SNI = "cstonecloud.bigpandas.top"
 AAITR_IPV4 = "47.178.15.216"
 CLASH_TEMPLATE = Path(__file__).resolve().with_name("clash-template.yaml")
 DISPLAY_NAMES = {
-    "yuntu-aaitr-reality",
+    "cstonecloud-aaitr-reality",
     "aaitr-exit-reality",
-    "yuntu-aaitr-hy2",
+    "cstonecloud-aaitr-hy2",
     "aaitr-exit-hy2",
-    "yuntu-exit-reality",
-    "yuntu-exit-hy2",
+    "cstonecloud-exit-reality",
+    "cstonecloud-exit-hy2",
 }
 
 
@@ -189,9 +189,9 @@ def link_route_marker(link: str) -> str:
     if hostname == "verizon.bigpandas.top":
         return "aaitr-exit"
     if hostname == "cstonecloud.bigpandas.top" and port in {1443, 2443}:
-        return "yuntu-exit"
+        return "cstonecloud-exit"
     if hostname == "cstonecloud.bigpandas.top":
-        return "yuntu-aaitr"
+        return "cstonecloud-aaitr"
     fail(f"unexpected desktop link hostname: {hostname}")
 
 
@@ -344,11 +344,11 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
     groups = clash_proxy_groups(clash)
     required_groups = (
         "EXIT-MODE",
-        "YUNTU-AAITR",
-        "YUNTU-EXIT",
+        "CSTONECLOUD-AAITR",
+        "CSTONECLOUD-EXIT",
         "AAITR-EXIT",
-        "YUNTU-AAITR-AUTO",
-        "YUNTU-EXIT-AUTO",
+        "CSTONECLOUD-AAITR-AUTO",
+        "CSTONECLOUD-EXIT-AUTO",
         "AAITR-EXIT-AUTO",
     )
     for group in required_groups:
@@ -356,19 +356,19 @@ def verify_clash_policy(client_name: str, clash: str | None = None) -> None:
             fail(f"Clash subscription is missing the {group} proxy group")
     if groups["EXIT-MODE"] != {
         "type": "select",
-        "proxies": ["YUNTU-AAITR", "YUNTU-EXIT", "AAITR-EXIT"],
+        "proxies": ["CSTONECLOUD-AAITR", "CSTONECLOUD-EXIT", "AAITR-EXIT"],
     }:
         fail("Clash subscription has unexpected members in the EXIT-MODE group")
     manual_groups = {
-        "YUNTU-AAITR": (
-            "YUNTU-AAITR-AUTO",
-            "yuntu-aaitr-reality",
-            "yuntu-aaitr-hy2",
+        "CSTONECLOUD-AAITR": (
+            "CSTONECLOUD-AAITR-AUTO",
+            "cstonecloud-aaitr-reality",
+            "cstonecloud-aaitr-hy2",
         ),
-        "YUNTU-EXIT": (
-            "YUNTU-EXIT-AUTO",
-            "yuntu-exit-reality",
-            "yuntu-exit-hy2",
+        "CSTONECLOUD-EXIT": (
+            "CSTONECLOUD-EXIT-AUTO",
+            "cstonecloud-exit-reality",
+            "cstonecloud-exit-hy2",
         ),
         "AAITR-EXIT": (
             "AAITR-EXIT-AUTO",
@@ -393,7 +393,7 @@ def verify_subscriptions(source: dict) -> None:
             fail(f"raw subscription is missing protocols: {sorted(missing)}")
         if len(link_lines) != 6:
             fail(f"raw subscription should contain 6 desktop links, found {len(link_lines)}")
-        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+        for marker in ("cstonecloud-aaitr", "aaitr-exit", "cstonecloud-exit"):
             count = sum(link_route_marker(line) == marker for line in link_lines)
             if count != 2:
                 fail(f"raw subscription should contain 2 {marker} links, found {count}")
@@ -417,7 +417,7 @@ def verify_subscriptions(source: dict) -> None:
             fail(f"JSON subscription is missing protocols: {sorted(missing)}")
         if len(outbounds) != 6:
             fail(f"JSON subscription should contain 6 desktop outbounds, found {len(outbounds)}")
-        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+        for marker in ("cstonecloud-aaitr", "aaitr-exit", "cstonecloud-exit"):
             count = sum(marker in str(outbound.get("tag", "")) for outbound in outbounds)
             if count != 2:
                 fail(f"JSON subscription should contain 2 {marker} outbounds, found {count}")
@@ -426,7 +426,7 @@ def verify_subscriptions(source: dict) -> None:
         for protocol in clash_expected:
             if f"type: {protocol}" not in clash:
                 fail(f"Clash subscription is missing protocol: {protocol}")
-        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+        for marker in ("cstonecloud-aaitr", "aaitr-exit", "cstonecloud-exit"):
             if clash.count(marker) < 2:
                 fail(f"Clash subscription is missing {marker} nodes")
         for protocol in ("socks5", "socks", "http"):
@@ -457,7 +457,7 @@ def verify_protocols(source: dict) -> None:
             marker = link_route_marker(link)
             checks.append((protocol, marker, link))
             found.add((protocol, marker))
-        for marker in ("yuntu-aaitr", "aaitr-exit", "yuntu-exit"):
+        for marker in ("cstonecloud-aaitr", "aaitr-exit", "cstonecloud-exit"):
             missing = {
                 protocol
                 for protocol in ("vless", "hysteria2")

@@ -1,5 +1,5 @@
 [Unit]
-Description=Sync AaITR s-ui production users to YunTu pure-exit sing-box
+Description=Sync AaITR s-ui production users to CStoneCloud pure-exit sing-box
 After=network-online.target
 Wants=network-online.target
 

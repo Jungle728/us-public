@@ -7,7 +7,7 @@
 - 管理生产订阅用户和转发代理用户。
 - 生成 raw / sing-box JSON / Clash 订阅。
 - 提供 Reality、Hysteria2 桌面入站，以及一个直连 AaITR 的认证 SOCKS5 转发入口。
-- 渲染 YunTu 直接出口配置，并通过 systemd timer 同步到 YunTu。
+- 渲染 CStoneCloud 直接出口配置，并通过 systemd timer 同步到 CStoneCloud。
 - 提供验证脚本，检查订阅、协议链路和 forward proxy 出口。
 
 ## 管理面板
@@ -24,7 +24,7 @@
 | `127.0.0.1:3095` | s-ui 面板 |
 | `127.0.0.1:3096` | 订阅服务 |
 | `127.0.0.1:31443` | VLESS Reality，由 edge SNI 路由选择 |
-| `32443/udp` | Hysteria2，可经 YunTu UDP 443 中转或 AaITR 直连 |
+| `32443/udp` | Hysteria2，可经 CStoneCloud UDP 443 中转或 AaITR 直连 |
 | `1080/tcp` | 认证 SOCKS5，直连 AaITR 出口，供服务器/API 使用 |
 
 s-ui 容器使用 host network，因此公网暴露由 UFW 和 `s-ui-edge` 控制。SOCKS5 不做来源白名单，但仍要求 s-ui 用户名/密码认证。
@@ -63,8 +63,8 @@ rules:
 
 | 分组 | 链路 |
 |---|---|
-| `YUNTU-AAITR` | 客户端 -> YunTu -> AaITR -> 目标网站 |
-| `YUNTU-EXIT` | 客户端 -> YunTu -> 目标网站 |
+| `CSTONECLOUD-AAITR` | 客户端 -> CStoneCloud -> AaITR -> 目标网站 |
+| `CSTONECLOUD-EXIT` | 客户端 -> CStoneCloud -> 目标网站 |
 | `AAITR-EXIT` | 客户端 -> AaITR -> 目标网站 |
 
 每个手动模式组默认选择对应的 `*-AUTO` URLTest，也允许固定 Reality 或 Hysteria2。AUTO 仍只会在同一条出口链路的两种协议中选择延迟最低的节点，不会跨模式改变出口。
@@ -110,12 +110,12 @@ python3 ./apply_clash_template.py
 当前桌面订阅节点命名按链路优先：
 
 ```text
-yuntu-aaitr-reality / yuntu-aaitr-hy2
-yuntu-exit-reality  / yuntu-exit-hy2
+cstonecloud-aaitr-reality / cstonecloud-aaitr-hy2
+cstonecloud-exit-reality  / cstonecloud-exit-hy2
 aaitr-exit-reality  / aaitr-exit-hy2
 ```
 
-其中 YunTu 节点地址和 TLS SNI 使用 `cstonecloud.bigpandas.top`，AaITR
+其中 CStoneCloud 节点地址和 TLS SNI 使用 `cstonecloud.bigpandas.top`，AaITR
 直连节点及 SOCKS5 地址使用 `verizon.bigpandas.top`。
 
 刷新入站地址布局：
@@ -125,9 +125,9 @@ cd /root/code/us-public/s-ui
 python3 ./apply_desktop_direct_nodes.py
 ```
 
-## YunTu exit 自动同步
+## CStoneCloud exit 自动同步
 
-AaITR 负责生成 YunTu 直接出口 sing-box 配置：
+AaITR 负责生成 CStoneCloud 直接出口 sing-box 配置。为兼容既有生产部署，脚本文件、systemd 单元、容器和运行目录仍保留内部标识 `yuntu-exit`：
 
 ```bash
 cd /root/code/us-public/s-ui
@@ -144,15 +144,15 @@ systemctl status yuntu-exit-sync.timer --no-pager
 journalctl -u yuntu-exit-sync.service -n 50 --no-pager
 ```
 
-s-ui 会立即为新用户生成订阅；timer 负责在约一分钟内规范化三条链路的节点名称，并把 `aaitr-production` 用户的 Reality、Hysteria2 认证同步到 YunTu exit。`yuntu-exit-sync-*` 是单次同步使用的临时工作目录，正常结束会自动删除，不是用户数据目录。
+s-ui 会立即为新用户生成订阅；timer 负责在约一分钟内规范化三条链路的节点名称，并把 `aaitr-production` 用户的 Reality、Hysteria2 认证同步到 CStoneCloud exit。`yuntu-exit-sync-*` 是单次同步使用的临时工作目录，正常结束会自动删除，不是用户数据目录。
 
 同步流程：
 
 1. 通过 s-ui 原生接口统一 `aaitr-production` 用户的两种协议权限，使运行中的核心立即热更新。
 2. 将新用户的 6 个 raw 节点名称规范为三条链路的固定命名。
-3. 渲染 YunTu Reality / Hysteria2 直接出口配置。
-4. SSH 推送配置和当前 TLS 证书到 YunTu 临时目录。
-5. 在 YunTu 上用 sing-box 校验。
+3. 渲染 CStoneCloud Reality / Hysteria2 直接出口配置。
+4. SSH 推送配置和当前 TLS 证书到 CStoneCloud 临时目录。
+5. 在 CStoneCloud 上用 sing-box 校验。
 6. 只有配置或证书 hash 变化时才替换运行文件并重启 `yuntu-exit`。
 
 手动立即同步：

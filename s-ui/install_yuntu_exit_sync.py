@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install or verify the AaITR-to-YunTu user synchronization timer."""
+"""Install or verify the AaITR-to-CStoneCloud synchronization timer."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def verify_installation() -> None:
         raise RuntimeError(f"systemd timer is not enabled: {TIMER}")
     if run(["systemctl", "is-active", TIMER]) != "active":
         raise RuntimeError(f"systemd timer is not active: {TIMER}")
-    print("YunTu exit synchronization timer: enabled and active")
+    print("CStoneCloud exit synchronization timer: enabled and active")
 
 
 def install() -> None:
@@ -69,7 +69,7 @@ def install() -> None:
     run(["systemctl", "restart", TIMER])
     run(["systemctl", "start", SERVICE])
     verify_installation()
-    print("YunTu exit production users synchronized")
+    print("CStoneCloud exit production users synchronized")
 
 
 def main() -> None:

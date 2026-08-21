@@ -168,7 +168,7 @@ function renderLogin(error = ""): void {
         <div class="login-status">
           <div class="status-orbit"><i data-lucide="route"></i></div>
           <p>线路管理</p>
-          <strong>YunTu <span>→</span> AaITR</strong>
+          <strong>CStoneCloud <span>→</span> AaITR</strong>
           <div class="login-tags"><span>Reality</span><span>Hysteria2</span></div>
         </div>
         <small>Private operations surface</small>
@@ -285,8 +285,8 @@ function renderDashboard(): string {
       <article class="panel route-panel">
         <div class="section-head"><div><span class="eyebrow">Traffic routes</span><h2>三种出口模式</h2></div><span class="quiet-badge">${panel.inbounds.filter((item) => ["vless", "hysteria2"].includes(item.type)).length} 个协议入口</span></div>
         <div class="route-list">
-          ${routeRow("YUN", "YunTu → AaITR", "家宽出口", "默认", "route-blue")}
-          ${routeRow("YT", "YunTu Exit", "机房出口", "备用", "route-amber")}
+          ${routeRow("CS", "CStoneCloud → AaITR", "家宽出口", "默认", "route-blue")}
+          ${routeRow("CSE", "CStoneCloud Exit", "机房出口", "备用", "route-amber")}
           ${routeRow("AA", "AaITR Exit", "家宽直连", "对照", "route-green")}
         </div>
       </article>
@@ -555,7 +555,7 @@ async function toggleClient(id: number): Promise<void> {
 function confirmDeleteClient(id: number): void {
   const client = panel?.clients.find((item) => item.id === id);
   if (!client) return;
-  openModal(`<section class="modal-card confirm-card"><header class="modal-head"><div><span class="eyebrow">Delete client</span><h2>删除 ${escapeHtml(client.name)}？</h2></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></header><div class="modal-body"><p>用户凭据和订阅将立即失效，YunTu 出口会在下一次同步中移除该用户。</p></div><footer class="modal-actions"><button class="secondary-btn" data-close-modal>取消</button><button class="danger-btn" id="delete-confirm"><i data-lucide="trash-2"></i>确认删除</button></footer></section>`);
+  openModal(`<section class="modal-card confirm-card"><header class="modal-head"><div><span class="eyebrow">Delete client</span><h2>删除 ${escapeHtml(client.name)}？</h2></div><button class="icon-btn" data-close-modal><i data-lucide="x"></i></button></header><div class="modal-body"><p>用户凭据和订阅将立即失效，CStoneCloud 出口会在下一次同步中移除该用户。</p></div><footer class="modal-actions"><button class="secondary-btn" data-close-modal>取消</button><button class="danger-btn" id="delete-confirm"><i data-lucide="trash-2"></i>确认删除</button></footer></section>`);
   document.querySelector("#delete-confirm")?.addEventListener("click", async () => {
     try { await api.saveClient("del", id); closeModal(); await reloadAll(); showToast("用户已删除"); }
     catch (error) { showToast(error instanceof Error ? error.message : "删除失败", "danger"); }

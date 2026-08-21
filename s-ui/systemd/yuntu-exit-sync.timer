@@ -1,5 +1,5 @@
 [Unit]
-Description=Run YunTu pure-exit sync every minute
+Description=Run CStoneCloud pure-exit sync every minute
 
 [Timer]
 OnBootSec=2min
