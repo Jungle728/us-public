@@ -16,9 +16,9 @@ from pathlib import Path
 ADMIN_PASSWORD = Path(__file__).resolve().with_name(".admin-password")
 SUI_BASE = "http://127.0.0.1:3095/app"
 SUI_SUB = "http://127.0.0.1:3096"
-PUBLIC_SUB = "https://sub.bigpandas.top"
-TLS_SNI = "yuntu.bigpandas.top"
-AAITR_IPV4 = "99.88.84.197"
+PUBLIC_SUB = "https://sub-verizon.bigpandas.top"
+TLS_SNI = "cstonecloud.bigpandas.top"
+AAITR_IPV4 = "47.178.15.216"
 CLASH_TEMPLATE = Path(__file__).resolve().with_name("clash-template.yaml")
 DISPLAY_NAMES = {
     "yuntu-aaitr-reality",
@@ -43,7 +43,7 @@ class SUI:
 
     def request(self, method: str, url: str, data: dict | None = None) -> dict:
         body = None
-        headers = {"Host": "sub.bigpandas.top"}
+        headers = {"Host": "sub-verizon.bigpandas.top"}
         if data is not None:
             body = urllib.parse.urlencode(data).encode()
             headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -150,7 +150,7 @@ def fetch_subscription(client_name: str, format_name: str = "") -> str:
         path = f"{SUI_SUB}/sub/{encoded_name}"
         if format_name:
             path += "?" + urllib.parse.urlencode({"format": format_name})
-    request = urllib.request.Request(path, headers={"Host": "sub.bigpandas.top"})
+    request = urllib.request.Request(path, headers={"Host": "sub-verizon.bigpandas.top"})
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 200:
             fail(f"subscription returned HTTP {response.status}")
@@ -186,11 +186,11 @@ def link_route_marker(link: str) -> str:
     parsed = urllib.parse.urlsplit(link)
     hostname = parsed.hostname
     port = parsed.port
-    if hostname == "proxy.bigpandas.top":
+    if hostname == "verizon.bigpandas.top":
         return "aaitr-exit"
-    if hostname == "yuntu.bigpandas.top" and port in {1443, 2443}:
+    if hostname == "cstonecloud.bigpandas.top" and port in {1443, 2443}:
         return "yuntu-exit"
-    if hostname == "yuntu.bigpandas.top":
+    if hostname == "cstonecloud.bigpandas.top":
         return "yuntu-aaitr"
     fail(f"unexpected desktop link hostname: {hostname}")
 

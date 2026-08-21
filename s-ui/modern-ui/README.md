@@ -48,7 +48,7 @@ docker compose exec -T nginx nginx -t
 
 访问路径：
 
-- 新面板：`https://panel.bigpandas.top/` 或 `/modern/`
-- 原面板高级配置：`https://panel.bigpandas.top/app/`
+- 新面板：`https://panel-verizon.bigpandas.top/` 或 `/modern/`
+- 原面板高级配置：`https://panel-verizon.bigpandas.top/app/`
 
 登录请求使用同源的 `/app/api/login`，数据读取复用 s-ui 的 `/app/api/{object}` 接口。当前首版把高风险的协议、TLS 和数据库写操作保留在原 s-ui 页面，点击“高级编辑”即可回到 `/app/`。

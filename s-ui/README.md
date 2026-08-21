@@ -12,8 +12,8 @@
 
 ## 管理面板
 
-- 日常管理：`https://panel.bigpandas.top/`，默认进入轻量现代控制台 `/modern/`。
-- 高级配置：`https://panel.bigpandas.top/app/`，保留原 s-ui 页面处理入站、TLS、路由和底层数据库操作。
+- 日常管理：`https://panel-verizon.bigpandas.top/`，默认进入轻量现代控制台 `/modern/`。
+- 高级配置：`https://panel-verizon.bigpandas.top/app/`，保留原 s-ui 页面处理入站、TLS、路由和底层数据库操作。
 
 现代控制台位于 `modern-ui/`，复用 s-ui 原生登录和 `/app/api/*`，生产环境只由 edge Nginx 提供约 100 KiB 的静态构建产物，不增加常驻容器或 Node 进程。构建和部署方式见 `modern-ui/README.md`。
 
@@ -73,8 +73,8 @@ rules:
 
 Shadowrocket 使用两项相互独立的远程资源：
 
-- 用户私有节点订阅：`https://sub.bigpandas.top/sub/<subscription-id>`
-- 公共分流配置：`https://sub.bigpandas.top/shadowrocket/config.conf`
+- 用户私有节点订阅：`https://sub-verizon.bigpandas.top/sub/<subscription-id>`
+- 公共分流配置：`https://sub-verizon.bigpandas.top/shadowrocket/config.conf`
 
 必须先添加节点订阅，再下载并启用公共配置。公共配置不含订阅 ID、UUID、密码或节点链接，也不绑定任何订阅名或节点名。自建订阅、机场订阅和手工节点可以同时存在；需要代理的流量统一使用 Shadowrocket 首页当前选中的节点。
 
@@ -115,6 +115,9 @@ yuntu-exit-reality  / yuntu-exit-hy2
 aaitr-exit-reality  / aaitr-exit-hy2
 ```
 
+其中 YunTu 节点地址和 TLS SNI 使用 `cstonecloud.bigpandas.top`，AaITR
+直连节点及 SOCKS5 地址使用 `verizon.bigpandas.top`。
+
 刷新入站地址布局：
 
 ```bash
@@ -148,9 +151,9 @@ s-ui 会立即为新用户生成订阅；timer 负责在约一分钟内规范化
 1. 通过 s-ui 原生接口统一 `aaitr-production` 用户的两种协议权限，使运行中的核心立即热更新。
 2. 将新用户的 6 个 raw 节点名称规范为三条链路的固定命名。
 3. 渲染 YunTu Reality / Hysteria2 直接出口配置。
-4. SSH 推送到 YunTu 临时文件。
+4. SSH 推送配置和当前 TLS 证书到 YunTu 临时目录。
 5. 在 YunTu 上用 sing-box 校验。
-6. 只有配置 hash 变化时才替换配置并重启 `yuntu-exit`。
+6. 只有配置或证书 hash 变化时才替换运行文件并重启 `yuntu-exit`。
 
 手动立即同步：
 

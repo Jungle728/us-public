@@ -19,6 +19,7 @@ def reconcile_production_clients() -> int:
     sui.login()
     inbounds = sui.get("inbounds") or []
     by_tag = {item.get("tag"): item for item in inbounds}
+    changed = 0
     if FORWARD_PROXY_TAG not in by_tag and "yuntu-socks5" in by_tag:
         legacy = sui.get("inbounds", {"id": int(by_tag["yuntu-socks5"]["id"])}) or []
         if len(legacy) != 1:
@@ -31,7 +32,7 @@ def reconcile_production_clients() -> int:
                 "listen_port": 1080,
                 "addrs": [
                     {
-                        "server": "proxy.bigpandas.top",
+                        "server": "verizon.bigpandas.top",
                         "server_port": 1080,
                         "remark": "-socks5",
                     }
@@ -39,8 +40,35 @@ def reconcile_production_clients() -> int:
             }
         )
         sui.save("inbounds", socks, action="edit")
+        changed += 1
         inbounds = sui.get("inbounds") or []
         by_tag = {item.get("tag"): item for item in inbounds}
+
+    proxy_summary = by_tag.get(FORWARD_PROXY_TAG)
+    if proxy_summary is not None:
+        proxy_rows = sui.get("inbounds", {"id": int(proxy_summary["id"])}) or []
+        if len(proxy_rows) != 1:
+            fail("unable to load the AaITR SOCKS5 inbound")
+        proxy_inbound = proxy_rows[0]
+        desired_proxy_addrs = [
+            {
+                "server": "verizon.bigpandas.top",
+                "server_port": 1080,
+                "remark": "-socks5",
+            }
+        ]
+        if (
+            proxy_inbound.get("listen") != "0.0.0.0"
+            or int(proxy_inbound.get("listen_port", 0)) != 1080
+            or proxy_inbound.get("addrs") != desired_proxy_addrs
+        ):
+            proxy_inbound["listen"] = "0.0.0.0"
+            proxy_inbound["listen_port"] = 1080
+            proxy_inbound["addrs"] = desired_proxy_addrs
+            sui.save("inbounds", proxy_inbound, action="edit")
+            changed += 1
+            inbounds = sui.get("inbounds") or []
+            by_tag = {item.get("tag"): item for item in inbounds}
 
     missing = (PRODUCTION_TAGS | {FORWARD_PROXY_TAG}) - set(by_tag)
     if missing:
@@ -48,7 +76,6 @@ def reconcile_production_clients() -> int:
     desired = sorted(int(by_tag[tag]["id"]) for tag in PRODUCTION_TAGS)
     proxy_id = int(by_tag[FORWARD_PROXY_TAG]["id"])
 
-    changed = 0
     production = [
         item
         for item in (sui.get("clients") or [])

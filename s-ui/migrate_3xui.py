@@ -26,8 +26,8 @@ SOURCE_DB = "/opt/3x-ui/data/x-ui.db"
 ADMIN_PASSWORD = Path(__file__).resolve().with_name(".admin-password")
 SUI_BASE = "http://127.0.0.1:3095/app"
 SUI_SUB = "http://127.0.0.1:3096"
-PUBLIC_HOST = "yuntu.bigpandas.top"
-TLS_SNI = "yuntu.bigpandas.top"
+PUBLIC_HOST = "cstonecloud.bigpandas.top"
+TLS_SNI = "cstonecloud.bigpandas.top"
 CERT_PATH = "/app/cert/live/s-ui-domains/fullchain.pem"
 KEY_PATH = "/app/cert/live/s-ui-domains/privkey.pem"
 
@@ -170,7 +170,7 @@ class SUI:
 
     def request(self, method: str, url: str, data: dict | None = None) -> dict:
         body = None
-        headers = {"Host": "sub.bigpandas.top"}
+        headers = {"Host": "sub-verizon.bigpandas.top"}
         if data is not None:
             body = urllib.parse.urlencode(data).encode()
             headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -388,7 +388,7 @@ def inbound_payloads(tls_ids: dict) -> list[dict]:
             "listen": "0.0.0.0",
             "listen_port": 1080,
             "tls_id": 0,
-            "addrs": [{"server": "proxy.bigpandas.top", "server_port": 1080, "remark": "-socks5"}],
+            "addrs": [{"server": "verizon.bigpandas.top", "server_port": 1080, "remark": "-socks5"}],
             "out_json": {},
         },
     ]
@@ -398,7 +398,7 @@ def fetch_subscription(client_name: str, format_name: str = "") -> str:
     path = f"{SUI_SUB}/sub/{urllib.parse.quote(client_name, safe='')}"
     if format_name:
         path += "?" + urllib.parse.urlencode({"format": format_name})
-    request = urllib.request.Request(path, headers={"Host": "sub.bigpandas.top"})
+    request = urllib.request.Request(path, headers={"Host": "sub-verizon.bigpandas.top"})
     with urllib.request.urlopen(request, timeout=15) as response:
         if response.status != 200:
             fail(f"subscription returned HTTP {response.status}")
@@ -521,7 +521,7 @@ def verify_forward_proxies(source: dict) -> None:
         result = subprocess.run(command, capture_output=True, text=True, timeout=25)
         if result.returncode != 0:
             fail(f"{name} proxy test failed with curl exit {result.returncode}")
-        if result.stdout.strip() != "99.88.84.197":
+        if result.stdout.strip() != "47.178.15.216":
             fail(f"{name} proxy egress did not match the AaITR IPv4 address")
     print("verified forward proxy: direct AaITR SOCKS5")
     print("forward proxy egress: AaITR IPv4")

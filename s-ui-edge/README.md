@@ -6,12 +6,12 @@
 
 - TCP 80：ACME HTTP-01 验证和 HTTP 到 HTTPS 跳转。
 - TCP 443：按 SNI 分流 Reality、面板和订阅。
-- `panel.bigpandas.top`：反向代理到 s-ui 面板。
-- `panel.bigpandas.top/modern/`：由 Nginx 直接提供轻量现代控制台，根路径默认跳转至此。
-- `panel.bigpandas.top/app/`：保留原 s-ui 面板，用于协议、TLS 和底层配置。
-- `sub.bigpandas.top`：提供 `/sub/`、`/json/`、`/clash/` 兼容订阅路径。
-- `sub.bigpandas.top/shadowrocket/config.conf`：提供不含用户凭据的 Shadowrocket 公共配置。
-- `sub.bigpandas.top/shadowrocket/ai.list`：提供优先于 CN 白名单的关键 AI 域名规则。
+- `panel-verizon.bigpandas.top`：反向代理到 s-ui 面板。
+- `panel-verizon.bigpandas.top/modern/`：由 Nginx 直接提供轻量现代控制台，根路径默认跳转至此。
+- `panel-verizon.bigpandas.top/app/`：保留原 s-ui 面板，用于协议、TLS 和底层配置。
+- `sub-verizon.bigpandas.top`：提供 `/sub/`、`/json/`、`/clash/` 兼容订阅路径。
+- `sub-verizon.bigpandas.top/shadowrocket/config.conf`：提供不含用户凭据的 Shadowrocket 公共配置。
+- `sub-verizon.bigpandas.top/shadowrocket/ai.list`：提供优先于 CN 白名单的关键 AI 域名规则。
 - 对 `/json/` 和 `/clash/` 响应做显示名称规范化，不修改协议凭据。
 - 隐藏 s-ui 默认订阅更新间隔，统一发布 `Profile-Update-Interval: 1`。
 

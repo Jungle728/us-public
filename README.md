@@ -5,6 +5,13 @@
 - **AaITR 落地机**：运行 s-ui、订阅服务、HTTPS/SNI 边缘入口和 AaITR 家宽出口。
 - **YunTu 线路机**：作为 Reality/Hysteria2 的入口中转，以及可选的 YunTu 机房出口。
 
+当前生产主机：
+
+| 角色 | 主机 | 节点域名 |
+|---|---|---|
+| AaITR | `47.178.15.216` | `verizon.bigpandas.top` |
+| YunTu | `70.39.179.159` | `cstonecloud.bigpandas.top` |
+
 仓库只保存可公开的编排、模板、脚本和中文说明；运行数据库、面板密码、证书私钥、订阅凭据、客户端配置和备份都被 `.gitignore` 排除。
 
 ## 当前拓扑
@@ -26,7 +33,7 @@
 
 每个模式组默认使用对应的 `*-AUTO`，自动在 Reality 和 Hysteria2 两种协议中选择延迟最低的节点；需要排障或保持固定传输时，也可以在模式组内手动指定协议。
 
-macOS 和 iOS 的 Shadowrocket 使用一份与节点订阅解耦的公共配置。用户添加自建或机场订阅后，再启用 `https://sub.bigpandas.top/shadowrocket/config.conf`，将全局路由设为“配置”，规则中的 `PROXY` 就会使用首页当前选中的任意节点；未知域名同样默认代理。Clash/Mihomo 仍保留三种链路分组和自动选路，不受 Shadowrocket 配置影响。
+macOS 和 iOS 的 Shadowrocket 使用一份与节点订阅解耦的公共配置。用户添加自建或机场订阅后，再启用 `https://sub-verizon.bigpandas.top/shadowrocket/config.conf`，将全局路由设为“配置”，规则中的 `PROXY` 就会使用首页当前选中的任意节点；未知域名同样默认代理。Clash/Mihomo 仍保留三种链路分组和自动选路，不受 Shadowrocket 配置影响。
 
 ## 目录结构
 

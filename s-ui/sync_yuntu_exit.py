@@ -21,10 +21,17 @@ from reconcile_production_clients import reconcile_production_clients
 ROOT = Path(__file__).resolve().parent
 LOCK_FILE = ROOT / "yuntu-exit" / ".sync.lock"
 LOCAL_CONFIG = ROOT / "yuntu-exit" / "config.json"
-REMOTE = "root@154.23.242.22"
+LOCAL_CERT_DIR = ROOT.parent / "s-ui-edge" / "letsencrypt" / "live" / "s-ui-domains"
+LOCAL_FULLCHAIN = LOCAL_CERT_DIR / "fullchain.pem"
+LOCAL_PRIVKEY = LOCAL_CERT_DIR / "privkey.pem"
+REMOTE = "root@70.39.179.159"
 REMOTE_DIR = "/root/code/aaitr/yuntu-exit"
 REMOTE_CONFIG = f"{REMOTE_DIR}/config.json"
-REMOTE_NEXT = f"{REMOTE_DIR}/config.json.next"
+REMOTE_CERT_DIR = f"{REMOTE_DIR}/cert"
+REMOTE_STAGE = f"{REMOTE_DIR}/.sync-next"
+REMOTE_NEXT = f"{REMOTE_STAGE}/config.json"
+REMOTE_NEXT_FULLCHAIN = f"{REMOTE_STAGE}/fullchain.pem"
+REMOTE_NEXT_PRIVKEY = f"{REMOTE_STAGE}/privkey.pem"
 REMOTE_BACKUPS = f"{REMOTE_DIR}/backups"
 SSH_KEY = "/root/.ssh/yuntu_exit_sync_ed25519"
 SING_BOX_IMAGE = (
@@ -91,10 +98,32 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def combined_sha256(paths: tuple[Path, ...]) -> str:
+    digest = hashlib.sha256()
+    for path in paths:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    return digest.hexdigest()
+
+
 def remote_sha256() -> str:
     output = run(
         ssh_shell(
             f"test -f {REMOTE_CONFIG!r} && sha256sum {REMOTE_CONFIG!r} | awk '{{print $1}}' || true"
+        ),
+        timeout=30,
+    )
+    return output.strip()
+
+
+def remote_certificate_sha256() -> str:
+    output = run(
+        ssh_shell(
+            f"test -f {REMOTE_CERT_DIR!r}/fullchain.pem "
+            f"-a -f {REMOTE_CERT_DIR!r}/privkey.pem && "
+            f"cat {REMOTE_CERT_DIR!r}/fullchain.pem {REMOTE_CERT_DIR!r}/privkey.pem "
+            "| sha256sum | awk '{print $1}' || true"
         ),
         timeout=30,
     )
@@ -115,27 +144,43 @@ def render_local_config() -> None:
         sys.argv = argv
 
 
-def sync_remote(local_hash: str) -> None:
+def sync_remote(local_hash: str, local_certificate_hash: str) -> None:
     if not Path(SSH_KEY).exists():
         raise RuntimeError(f"SSH key is missing: {SSH_KEY}")
-    run(ssh_base() + ["mkdir", "-p", REMOTE_DIR, REMOTE_BACKUPS], timeout=30)
+    run(
+        ssh_base()
+        + ["mkdir", "-p", REMOTE_DIR, REMOTE_BACKUPS, REMOTE_CERT_DIR, REMOTE_STAGE],
+        timeout=30,
+    )
     run(scp_base() + [str(LOCAL_CONFIG), f"{REMOTE}:{REMOTE_NEXT}"], timeout=60)
+    run(
+        scp_base() + [str(LOCAL_FULLCHAIN), f"{REMOTE}:{REMOTE_NEXT_FULLCHAIN}"],
+        timeout=60,
+    )
+    run(
+        scp_base() + [str(LOCAL_PRIVKEY), f"{REMOTE}:{REMOTE_NEXT_PRIVKEY}"],
+        timeout=60,
+    )
     remote_check = (
         f"set -euo pipefail; "
-        f"chmod 600 {REMOTE_NEXT!r}; "
+        f"chmod 600 {REMOTE_NEXT!r} {REMOTE_NEXT_FULLCHAIN!r} {REMOTE_NEXT_PRIVKEY!r}; "
         f"docker run --rm "
         f"-v {REMOTE_NEXT!r}:/etc/sing-box/config.json:ro "
-        f"-v {REMOTE_DIR!r}/cert:/etc/sing-box/cert:ro "
+        f"-v {REMOTE_STAGE!r}:/etc/sing-box/cert:ro "
         f"{SING_BOX_IMAGE} check -c /etc/sing-box/config.json; "
         f"stamp=$(date -u +%Y%m%dT%H%M%SZ); "
         f"test -f {REMOTE_CONFIG!r} && cp -a {REMOTE_CONFIG!r} {REMOTE_BACKUPS!r}/config.json.$stamp.bak || true; "
-        f"mv {REMOTE_NEXT!r} {REMOTE_CONFIG!r}; "
-        f"chmod 600 {REMOTE_CONFIG!r}; "
+        f"test -f {REMOTE_CERT_DIR!r}/fullchain.pem && cp -a {REMOTE_CERT_DIR!r}/fullchain.pem {REMOTE_BACKUPS!r}/fullchain.pem.$stamp.bak || true; "
+        f"test -f {REMOTE_CERT_DIR!r}/privkey.pem && cp -a {REMOTE_CERT_DIR!r}/privkey.pem {REMOTE_BACKUPS!r}/privkey.pem.$stamp.bak || true; "
+        f"install -m 600 {REMOTE_NEXT!r} {REMOTE_CONFIG!r}; "
+        f"install -m 600 {REMOTE_NEXT_FULLCHAIN!r} {REMOTE_CERT_DIR!r}/fullchain.pem; "
+        f"install -m 600 {REMOTE_NEXT_PRIVKEY!r} {REMOTE_CERT_DIR!r}/privkey.pem; "
         f"cd /root/code/aaitr; "
         f"docker compose restart yuntu-exit; "
         f"sleep 8; "
         f"test \"$(docker inspect -f '{{{{.State.Health.Status}}}}' yuntu-exit-sing-box)\" = healthy; "
-        f"test \"$(sha256sum {REMOTE_CONFIG!r} | awk '{{print $1}}')\" = {local_hash!r}"
+        f"test \"$(sha256sum {REMOTE_CONFIG!r} | awk '{{print $1}}')\" = {local_hash!r}; "
+        f"test \"$(cat {REMOTE_CERT_DIR!r}/fullchain.pem {REMOTE_CERT_DIR!r}/privkey.pem | sha256sum | awk '{{print $1}}')\" = {local_certificate_hash!r}"
     )
     run(ssh_shell(remote_check), timeout=180)
 
@@ -146,18 +191,26 @@ def main() -> None:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         reconcile_production_clients()
         reconcile_desktop_nodes()
+        for certificate_path in (LOCAL_FULLCHAIN, LOCAL_PRIVKEY):
+            if not certificate_path.is_file():
+                raise RuntimeError(f"certificate file is missing: {certificate_path}")
         with tempfile.TemporaryDirectory(prefix="yuntu-exit-sync-", dir=str(ROOT)) as tmp:
             tmp_config = Path(tmp) / "config.json"
             render_local_config()
             shutil.copy2(LOCAL_CONFIG, tmp_config)
             local_hash = sha256(tmp_config)
+            local_certificate_hash = combined_sha256((LOCAL_FULLCHAIN, LOCAL_PRIVKEY))
             current_remote_hash = remote_sha256()
-            if current_remote_hash == local_hash:
-                print("YunTu exit config already up to date")
+            current_remote_certificate_hash = remote_certificate_sha256()
+            if (
+                current_remote_hash == local_hash
+                and current_remote_certificate_hash == local_certificate_hash
+            ):
+                print("YunTu exit config and certificate already up to date")
                 return
             shutil.copy2(tmp_config, LOCAL_CONFIG)
-            sync_remote(local_hash)
-            print("YunTu exit config synced and yuntu-exit restarted")
+            sync_remote(local_hash, local_certificate_hash)
+            print("YunTu exit config and certificate synced; yuntu-exit restarted")
 
 
 if __name__ == "__main__":

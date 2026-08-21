@@ -20,19 +20,19 @@ PROFILES = {
         "tag": "yuntu-reality",
         "listen": "127.0.0.1",
         "listen_port": 31443,
-        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 443, "remark": "-reality"}],
+        "addrs": [{"server": "cstonecloud.bigpandas.top", "server_port": 443, "remark": "-reality"}],
     },
     "canary-hysteria2": {
         "tag": "yuntu-hysteria2",
         "listen": "0.0.0.0",
         "listen_port": 32443,
-        "addrs": [{"server": "yuntu.bigpandas.top", "server_port": 443, "remark": "-hy2"}],
+        "addrs": [{"server": "cstonecloud.bigpandas.top", "server_port": 443, "remark": "-hy2"}],
     },
     "canary-socks5": {
         "tag": "aaitr-socks5",
         "listen": "0.0.0.0",
         "listen_port": 1080,
-        "addrs": [{"server": "proxy.bigpandas.top", "server_port": 1080, "remark": "-socks5"}],
+        "addrs": [{"server": "verizon.bigpandas.top", "server_port": 1080, "remark": "-socks5"}],
     },
 }
 
@@ -63,10 +63,10 @@ def main() -> None:
     tls_full.setdefault("server", {})["key_path"] = (
         "/app/cert/live/s-ui-domains/privkey.pem"
     )
-    tls_full.setdefault("server", {})["server_name"] = "yuntu.bigpandas.top"
-    tls_full.setdefault("client", {})["server_name"] = "yuntu.bigpandas.top"
+    tls_full.setdefault("server", {})["server_name"] = "cstonecloud.bigpandas.top"
+    tls_full.setdefault("client", {})["server_name"] = "cstonecloud.bigpandas.top"
     sui.save("tls", tls_full, action="edit")
-    print("promoted TLS SNI: yuntu.bigpandas.top")
+    print("promoted TLS SNI: cstonecloud.bigpandas.top")
 
     for old_tag, desired in PROFILES.items():
         current = by_tag.get(old_tag) or by_tag.get(desired["tag"])

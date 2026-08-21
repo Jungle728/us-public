@@ -32,7 +32,7 @@ def validate() -> None:
         "udp-policy-not-supported-behaviour = REJECT",
         "close-if-proxy-chain-missing = true",
         "always-real-ip = *.bigpandas.top,shu26.cfd,ucloud-frp.sometimesnaive.top",
-        "RULE-SET,https://sub.bigpandas.top/shadowrocket/ai.list,PROXY",
+        "RULE-SET,https://sub-verizon.bigpandas.top/shadowrocket/ai.list,PROXY",
         "DOMAIN-SUFFIX,browserleaks.com,PROXY",
         "DOMAIN-SUFFIX,cn,DIRECT",
         "DOMAIN-SET,https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Shadowrocket/China/China_Domain.list,DIRECT",
@@ -45,7 +45,7 @@ def validate() -> None:
         raise RuntimeError("config.conf: profile must not bind rules to custom groups")
 
     ai_position = profile.index(
-        "RULE-SET,https://sub.bigpandas.top/shadowrocket/ai.list,PROXY"
+        "RULE-SET,https://sub-verizon.bigpandas.top/shadowrocket/ai.list,PROXY"
     )
     cn_position = profile.index("DOMAIN-SUFFIX,cn,DIRECT")
     final_position = profile.index("FINAL,PROXY")

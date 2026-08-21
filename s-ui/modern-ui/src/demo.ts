@@ -16,7 +16,7 @@ export const demoData: PanelData = {
   ],
   outbounds: [], endpoints: [], services: [],
   onlines: { inbound: ["yuntu-reality"], outbound: [], user: ["lhl", "wzd"] },
-  subURI: "https://sub.bigpandas.top/sub/",
+  subURI: "https://sub-verizon.bigpandas.top/sub/",
   enableTraffic: true,
   os: "linux",
 };

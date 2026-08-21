@@ -2,6 +2,9 @@
 
 该目录对应 YunTu 机器 `/root/code/aaitr` 的公开部署模板。YunTu 不是用户管理源，它只承担入口线路、中转和可选机房出口。
 
+当前 YunTu 主机为 `70.39.179.159`（`cstonecloud.bigpandas.top`），中转目标
+AaITR 为 `47.178.15.216`（`verizon.bigpandas.top`）。
+
 ## 职责
 
 ```text

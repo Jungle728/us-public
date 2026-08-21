@@ -82,7 +82,7 @@ def build_config(
     if not handshake.get("server") or not handshake.get("server_port"):
         fail("Reality handshake target is missing")
 
-    server_name = certificate_server.get("server_name") or "yuntu.bigpandas.top"
+    server_name = certificate_server.get("server_name") or "cstonecloud.bigpandas.top"
 
     return {
         "log": {"level": "warn", "timestamp": True},

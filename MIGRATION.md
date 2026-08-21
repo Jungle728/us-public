@@ -19,6 +19,15 @@ client -> YunTu -> internet
 client -> AaITR -> internet
 ```
 
+当前生产目标为：
+
+- AaITR：`47.178.15.216`，节点域名 `verizon.bigpandas.top`
+- YunTu：`70.39.179.159`，节点域名 `cstonecloud.bigpandas.top`
+- 面板：`panel-verizon.bigpandas.top`
+- 订阅：`sub-verizon.bigpandas.top`
+- AaITR 目录：`/root/code/us-public`
+- YunTu 目录：`/root/code/aaitr`
+
 每条链路提供 VLESS Reality 和 Hysteria2。SOCKS5 是直连 AaITR 的独立服务器转发代理，不进入桌面节点订阅。
 
 ## 更换机器时
