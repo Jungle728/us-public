@@ -61,6 +61,7 @@ remnawave-edge/certbot-www/
 remnawave-edge/certbot-lib/
 remnawave-edge/certbot-logs/
 remnawave-edge/backups/
+remnawave-edge/subscription-aliases.conf
 singbox-hy2/config.json
 singbox-hy2/.sync.lock
 

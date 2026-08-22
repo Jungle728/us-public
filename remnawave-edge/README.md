@@ -24,6 +24,22 @@ ACME 续期、TLS Vision 普通 HTTPS 回落和公共 Shadowrocket 规则。
 根路径 `https://sub-verizon.bigpandas.top/<short-uuid>.yaml` 和 `.yml` 也提供相同
 的直接 YAML 响应。
 
+为兼容旧 s-ui 的用户名链接，生产机额外生成被 `.gitignore` 排除的
+`subscription-aliases.conf`。它把活跃用户的
+`/clash/<username>`、`/clash/<username>.yaml` 和 `.yml` 映射到当前短 UUID 的
+Mihomo 原始接口，因此 `https://sub-verizon.bigpandas.top/clash/zyz` 会直接返回
+YAML，不再打开 Subscription Page。生成或刷新映射：
+
+```bash
+cd /root/code/us-public/remnawave-edge
+python3 ./sync_subscription_aliases.py
+docker compose run --rm --no-deps nginx nginx -t
+docker compose up -d nginx
+```
+
+用户名别名沿用旧 s-ui 的便利性，也意味着用户名本身成为可枚举的订阅入口；
+需要更强的访问保密性时，应继续使用短 UUID 链接。
+
 ## 运行数据
 
 以下目录仅存在于服务器并由 `.gitignore` 排除：
