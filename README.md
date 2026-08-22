@@ -31,9 +31,9 @@
 | `CSC` | 客户端 -> CStoneCloud -> 互联网 | CStoneCloud 机房 | 备用、下载、对 IP 质量不敏感的流量 |
 | `AAITR` | 客户端 -> AaITR -> 互联网 | AaITR 家宽 | 直连 AaITR 备用与对照测试 |
 
-每个模式组默认使用对应的 `*-AUTO`，自动在 Reality、Hysteria2 和 TLS Vision
-三种协议中选择延迟最低的节点；需要排障或保持固定传输时，也可以在模式组内
-手动指定协议。
+每个模式组默认使用对应的 `*-AUTO`，自动在 Reality 和 Hysteria2
+两种主力协议中选择延迟最低的节点；TLS Vision 仍保留在手动列表中，作为
+受限网络下的 TCP 443 备用，不参与自动选路。
 
 Hysteria2 订阅使用经过既有线路验证的公网 UDP 端口：`csc-aaitr-hy2` 为
 `443`、`csc-hy2` 为 `2443`、`aaitr-hy2` 为 `32443`。迁移期的
