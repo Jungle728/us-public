@@ -114,7 +114,7 @@ Verizon Xray、Verizon sing-box、CStoneCloud Xray 和 CStoneCloud sing-box。
 
 Remnawave 只允许一个面板管理员。管理员创建用户后，把面板生成的
 `https://sub-verizon.bigpandas.top/<short-uuid>` 交给用户；浏览器打开是官方
-订阅页，客户端添加同一个地址则获得对应格式。普通用户没有面板密码，私有地址
+该地址直接返回 Mihomo YAML，不再显示订阅网页。普通用户没有面板密码，私有地址
 本身是访问凭据，泄露时应在面板撤销并重新生成。
 
 Verizon 的 `1080/TCP` 认证 SOCKS5 由 Remnawave Node 内的 Xray 静态入站提供，

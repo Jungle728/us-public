@@ -9,36 +9,18 @@ ACME 续期、TLS Vision 普通 HTTPS 回落和公共 Shadowrocket 规则。
 - `80/TCP`：ACME HTTP-01 和 HTTPS 跳转。
 - `443/TCP`：面板/订阅域名进入本机 `11443`，节点域名进入 Xray
   `30443` TLS Vision。
-- `127.0.0.1:11443`：终止面板与订阅 HTTPS；面板反代 Remnawave `3000`，订阅反代官方页面 `3010`。
+- `127.0.0.1:11443`：终止面板与订阅 HTTPS；面板反代 Remnawave `3000`，订阅根路径按短 UUID 反代 Mihomo YAML。
 - `127.0.0.1:18080`：TLS Vision 解密后的普通 HTTPS 回落站。
 - 未识别 SNI 直接拒绝，不再回落旧 s-ui Reality。
 
 旧 `/app/`、`/modern/`、`/sub/`、`/json/` 和 `/clash/` 路径返回 `410`。
-正式用户入口由 Remnawave 官方 Subscription Page 的 `/<short-uuid>` 提供。
-旧 `/api/sub/<short-uuid>` 仍代理到 Remnawave 后端，避免已添加的客户端失效。
-用户订阅链接若被手机客户端自动追加 `/clash`，入口会将其改写到 `/mihomo`，
-因为当前 Remnawave 的显式 CLASH 渲染器无法展开受管节点，而 Mihomo 渲染器可以。
-同时提供 s-ui 风格兼容地址 `https://sub-verizon.bigpandas.top/clash/<short-uuid>`。
-为兼容要求文件扩展名的移动客户端，`.yaml` 和 `.yml` 形式会直接代理后端
-`/api/sub/<short-uuid>/mihomo`，URL 响应体本身就是 YAML，不经过订阅网页。
-根路径 `https://sub-verizon.bigpandas.top/<short-uuid>.yaml` 和 `.yml` 也提供相同
-的直接 YAML 响应。
+唯一的用户订阅入口是
+`https://sub-verizon.bigpandas.top/<short-uuid>`。该地址直接代理
+`/api/sub/<short-uuid>/mihomo`，响应体就是原始 YAML，不经过 Subscription Page，
+也不需要追加 `/clash` 或 `.yaml` 后缀。
 
-为兼容旧 s-ui 的用户名链接，生产机额外生成被 `.gitignore` 排除的
-`subscription-aliases.conf`。它把活跃用户的
-`/clash/<username>`、`/clash/<username>.yaml` 和 `.yml` 映射到当前短 UUID 的
-Mihomo 原始接口，因此 `https://sub-verizon.bigpandas.top/clash/zyz` 会直接返回
-YAML，不再打开 Subscription Page。生成或刷新映射：
-
-```bash
-cd /root/code/us-public/remnawave-edge
-python3 ./sync_subscription_aliases.py
-docker compose run --rm --no-deps nginx nginx -t
-docker compose up -d nginx
-```
-
-用户名别名沿用旧 s-ui 的便利性，也意味着用户名本身成为可枚举的订阅入口；
-需要更强的访问保密性时，应继续使用短 UUID 链接。
+短 UUID 仍是用户订阅凭据；面板中修改节点、协议权限或模板后，客户端刷新这一
+地址即可获得最新配置。
 
 ## 运行数据
 
