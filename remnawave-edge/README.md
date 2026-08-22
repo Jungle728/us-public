@@ -1,6 +1,6 @@
 # Remnawave Edge
 
-该目录是 AaITR 上独立于旧 s-ui 的公网入口，生产路径为
+该目录是 Verizon 上独立于旧 s-ui 的公网入口，生产路径为
 `/root/code/us-public/remnawave-edge`。它只服务 Remnawave、Remnawave Node、
 ACME 续期、TLS Vision 普通 HTTPS 回落和公共 Shadowrocket 规则。
 
@@ -9,12 +9,15 @@ ACME 续期、TLS Vision 普通 HTTPS 回落和公共 Shadowrocket 规则。
 - `80/TCP`：ACME HTTP-01 和 HTTPS 跳转。
 - `443/TCP`：面板/订阅域名进入本机 `11443`，节点域名进入 Xray
   `30443` TLS Vision。
-- `127.0.0.1:11443`：终止面板与订阅 HTTPS，并反代 Remnawave `3000`。
+- `127.0.0.1:11443`：终止面板与订阅 HTTPS；面板反代 Remnawave `3000`，订阅反代官方页面 `3010`。
 - `127.0.0.1:18080`：TLS Vision 解密后的普通 HTTPS 回落站。
 - 未识别 SNI 直接拒绝，不再回落旧 s-ui Reality。
 
 旧 `/app/`、`/modern/`、`/sub/`、`/json/` 和 `/clash/` 路径返回 `410`。
-正式用户订阅由 Remnawave 的 `/api/sub/<short-uuid>` 提供。
+正式用户入口由 Remnawave 官方 Subscription Page 的 `/<short-uuid>` 提供。
+旧 `/api/sub/<short-uuid>` 仍代理到 Remnawave 后端，避免已添加的客户端失效。
+用户订阅链接若被手机客户端自动追加 `/clash`，入口会将其改写到 `/mihomo`，
+因为当前 Remnawave 的显式 CLASH 渲染器无法展开受管节点，而 Mihomo 渲染器可以。
 
 ## 运行数据
 
