@@ -1,0 +1,26 @@
+services:
+  remnawave-subscription-page:
+    image: remnawave/subscription-page:8.0.0@sha256:04e8d479afb3598024e4018e9e15cd7fe879938250090a690ba39f1ee91b79ac
+    container_name: remnawave-subscription-page
+    hostname: remnawave-subscription-page
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - 127.0.0.1:3010:3010
+    networks:
+      - remnawave-network
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    external: true

@@ -1,0 +1,71 @@
+diff --git a/src/features/dashboard/config-profiles/config-validation/config-validation.feature.tsx b/src/features/dashboard/config-profiles/config-validation/config-validation.feature.tsx
+index 62b4042..886205f 100644
+--- a/src/features/dashboard/config-profiles/config-validation/config-validation.feature.tsx
++++ b/src/features/dashboard/config-profiles/config-validation/config-validation.feature.tsx
+@@ -137,9 +137,12 @@ export const ConfigValidationFeature = {
+                     }
+                     seenTags.add(inbound.tag)
+
+-                    if (inbound.type === 'anytls' && inbound.tls?.enabled !== true) {
++                    if (
++                        ['anytls', 'hysteria2'].includes(inbound.type) &&
++                        inbound.tls?.enabled !== true
++                    ) {
+                         setResult(
+-                            `${dayjs().format('HH:mm:ss')} | AnyTLS requires tls.enabled: true.`
++                            `${dayjs().format('HH:mm:ss')} | ${inbound.type} requires tls.enabled: true.`
+                         )
+                         setIsConfigValid(false)
+                         return
+diff --git a/src/shared/schemas/singbox.schema.json b/src/shared/schemas/singbox.schema.json
+index 46d7e73..f3f77a9 100644
+--- a/src/shared/schemas/singbox.schema.json
++++ b/src/shared/schemas/singbox.schema.json
+@@ -23,6 +23,7 @@
+       "items": {
+         "oneOf": [
+           { "$ref": "#/definitions/anyTlsInbound" },
++          { "$ref": "#/definitions/hysteria2Inbound" },
+           { "$ref": "#/definitions/vlessInbound" },
+           { "$ref": "#/definitions/trojanInbound" },
+           { "$ref": "#/definitions/shadowsocksInbound" },
+@@ -190,6 +191,30 @@
+         "tls": { "$ref": "#/definitions/tlsInbound" }
+       }
+     },
++    "hysteria2Inbound": {
++      "title": "Hysteria2 inbound",
++      "type": "object",
++      "required": ["type", "tag", "listen_port", "users", "tls"],
++      "additionalProperties": true,
++      "properties": {
++        "type": { "const": "hysteria2" },
++        "tag": { "$ref": "#/definitions/tag" },
++        "listen": { "type": "string" },
++        "listen_port": {
++          "type": "integer",
++          "minimum": 1,
++          "maximum": 65535
++        },
++        "up_mbps": { "type": "integer", "minimum": 1 },
++        "down_mbps": { "type": "integer", "minimum": 1 },
++        "users": {
++          "type": "array",
++          "items": { "$ref": "#/definitions/userPassword" },
++          "description": "Keep empty in the profile; Remnawave injects active users."
++        },
++        "tls": { "$ref": "#/definitions/tlsInbound" }
++      }
++    },
+     "vlessInbound": {
+       "title": "VLESS inbound",
+       "type": "object",
+@@ -264,7 +289,7 @@
+         "type": {
+           "type": "string",
+           "not": {
+-            "enum": ["anytls", "vless", "trojan", "shadowsocks"]
++            "enum": ["anytls", "hysteria2", "vless", "trojan", "shadowsocks"]
+           }
+         },
+         "tag": { "$ref": "#/definitions/tag" }

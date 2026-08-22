@@ -1,0 +1,12 @@
+[Unit]
+Description=Check the CStoneCloud Remnawave certificate every six hours
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=6h
+AccuracySec=5min
+Persistent=true
+Unit=remnawave-cstone-cert-sync.service
+
+[Install]
+WantedBy=timers.target

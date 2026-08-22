@@ -1,0 +1,35 @@
+name: remnawave-hy2-managed
+
+services:
+  hy2-node:
+    image: local/remnawave-node:3.3.2-singbox-hy2
+    container_name: remnanode-singbox-hy2
+    hostname: remnanode-singbox-hy2
+    restart: unless-stopped
+    networks:
+      - remnawave-network
+    ports:
+      - 34443:34443/udp
+    env_file:
+      - node.env
+    volumes:
+      - /root/code/us-public/remnawave-edge/letsencrypt:/etc/letsencrypt:ro
+      - ./runtime/node-state:/var/lib/remnawave
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    external: true

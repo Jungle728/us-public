@@ -1,14 +1,14 @@
 services:
   nginx:
     image: nginx:1.30.3-alpine@sha256:0d3b80406a13a767339fbe2f41406d6c7da727ab89cf8fae399e81f780f814d1
-    container_name: s-ui-edge-nginx
+    container_name: remnawave-edge-nginx
     network_mode: host
     restart: unless-stopped
     command:
       - /bin/sh
       - -ec
       - |
-        cert=/etc/letsencrypt/live/s-ui-domains/fullchain.pem
+        cert=/etc/letsencrypt/live/remnawave-domains/fullchain.pem
         last_mtime=$$(stat -Lc %Y "$$cert")
         (
           while sleep 300; do
@@ -30,8 +30,7 @@ services:
       - ./letsencrypt:/etc/letsencrypt:ro
       - ./certbot-www:/var/www/certbot:ro
       - ./decoy:/usr/share/nginx/decoy:ro
-      - ${MODERN_UI_DIST:-/root/code/us-public/s-ui/modern-ui/dist}:/usr/share/nginx/modern:ro
-      - ${SHADOWROCKET_DIR:-/root/code/us-public/s-ui/shadowrocket}:/usr/share/nginx/shadowrocket:ro
+      - ./shadowrocket:/usr/share/nginx/shadowrocket:ro
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -61,7 +60,7 @@ services:
 
   certbot:
     image: certbot/certbot:v5.7.0@sha256:6bb19cff0b3972a69855686e0ccbd20b98dbfae2aa43845a5df48947ba1401b4
-    container_name: s-ui-edge-certbot
+    container_name: remnawave-edge-certbot
     network_mode: host
     restart: unless-stopped
     entrypoint: /bin/sh

@@ -1,0 +1,57 @@
+name: remnawave-hy2-managed-cstonecloud
+
+services:
+  hy2-node:
+    image: local/remnawave-node:3.3.2-singbox-hy2
+    container_name: remnanode-singbox-hy2-cstonecloud
+    hostname: remnanode-singbox-hy2-cstonecloud
+    restart: unless-stopped
+    env_file:
+      - node.env
+    ports:
+      - 127.0.0.1:2324:2323/tcp
+      - 127.0.0.1:34444:34444/udp
+    volumes:
+      - /root/code/aaitr/remnawave-node/cert:/etc/remnawave/cert:ro
+      - ./runtime/node-state:/var/lib/remnawave
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  management-relay:
+    image: gogost/gost:3.2.6@sha256:d0256552878ff6c0ffddae16236aa0a61c27b8311263c1a48cbe3128cf1e0af7
+    container_name: remnanode-singbox-hy2-cstonecloud-api
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - -L
+      - tcp://:2323/127.0.0.1:2324
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 64m
+    depends_on:
+      - hy2-node
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"

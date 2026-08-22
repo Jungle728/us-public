@@ -1,0 +1,359 @@
+diff --git a/.dockerignore b/.dockerignore
+new file mode 100644
+--- /dev/null
++++ b/.dockerignore
+@@ -0,0 +1,4 @@
++.git
++dist
++node_modules
++npm-debug.log
+diff --git a/Dockerfile b/Dockerfile
+index 16da4f1..3b1b404 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -1,5 +1,6 @@
+ FROM node:24.19-trixie-slim AS frontend
+ WORKDIR /opt/frontend
++ENV NODE_OPTIONS="--max-old-space-size=1536"
+
+ ARG FRONTEND_REPO=https://github.com/Cd1s/remnawave-frontend.git
+ ARG FRONTEND_REF=singbox
+@@ -14,6 +15,10 @@ RUN apt-get update \
+     && git fetch --depth 1 origin "${FRONTEND_REF}" \
+     && git checkout --detach FETCH_HEAD
+
++COPY frontend-hysteria2.patch /tmp/frontend-hysteria2.patch
++RUN git apply --check /tmp/frontend-hysteria2.patch \
++    && git apply /tmp/frontend-hysteria2.patch
++
+ RUN npm ci --prefer-offline --no-audit --no-fund \
+     && npm run start:build \
+     && mkdir -p dist/assets \
+diff --git a/package.json b/package.json
+index 09a95ea..c6e4d58 100644
+--- a/package.json
++++ b/package.json
+@@ -35,6 +35,7 @@
+     "fix": "oxfmt && oxlint --fix",
+     "sync:upstream": "node scripts/sync-upstream.cjs",
+     "validate:clash-anytls": "node scripts/validate-clash-anytls.cjs",
++    "validate:hysteria2": "node scripts/validate-hysteria2.cjs",
+     "validate:mihomo-anytls": "node scripts/validate-mihomo-anytls.cjs",
+     "validate:singbox-1.13": "node scripts/validate-singbox-1.13-compatibility.cjs",
+     "validate:shadowrocket-anytls": "node scripts/validate-shadowrocket-anytls.cjs",
+diff --git a/scripts/validate-hysteria2.cjs b/scripts/validate-hysteria2.cjs
+new file mode 100755
+--- /dev/null
++++ b/scripts/validate-hysteria2.cjs
+@@ -0,0 +1,145 @@
++#!/usr/bin/env node
++'use strict';
++
++const assert = require('node:assert/strict');
++
++require('./register-typescript.cjs');
++
++const { createCoreConfig } = require('../src/common/helpers/core-config/core-config.factory.ts');
++const {
++    SingBoxGeneratorService,
++} = require('../src/modules/subscription-template/generators/singbox.generator.service.ts');
++const {
++    ResolveProxyConfigService,
++} = require('../src/modules/subscription-template/resolve-proxy/resolve-proxy-config.service.ts');
++
++const inbound = {
++    type: 'hysteria2',
++    tag: 'HY2_TEST',
++    listen: '0.0.0.0',
++    listen_port: 34443,
++    up_mbps: 100,
++    down_mbps: 100,
++    users: [],
++    tls: {
++        enabled: true,
++        server_name: 'example.com',
++        certificate_path: '/etc/remnawave/tls/fullchain.pem',
++        key_path: '/etc/remnawave/tls/privkey.pem',
++    },
++};
++
++const coreConfig = createCoreConfig('singbox', {
++    inbounds: [inbound],
++    outbounds: [{ type: 'direct', tag: 'DIRECT' }],
++});
++
++assert.deepEqual(coreConfig.getAllInbounds(), [
++    {
++        tag: 'HY2_TEST',
++        rawInbound: inbound,
++        type: 'hysteria2',
++        network: 'udp',
++        security: 'tls',
++        port: 34443,
++    },
++]);
++
++coreConfig.includeUserBatch(
++    [
++        {
++            id: 42n,
++            vlessUuid: '00000000-0000-4000-8000-000000000042',
++            trojanPassword: 'unused',
++            ssPassword: 'unused',
++            tags: ['HY2_TEST'],
++        },
++    ],
++    new Map(),
++);
++
++assert.deepEqual(coreConfig.getConfig().inbounds[0].users, [
++    {
++        name: '42',
++        password: '00000000-0000-4000-8000-000000000042',
++    },
++]);
++
++const resolver = new ResolveProxyConfigService({
++    getOrThrow: () => 'sub.example.com',
++});
++const user = { vlessUuid: '00000000-0000-4000-8000-000000000042' };
++const inputHost = {
++    vlessRouteId: null,
++    securityLayer: 'DEFAULT',
++    alpn: null,
++    fingerprint: null,
++    sni: null,
++    keepSniBlank: false,
++    overrideSniFromAddress: false,
++    pinnedPeerCertSha256: null,
++    verifyPeerCertByName: null,
++};
++const protocol = resolver.resolveProtocolOptions(inputHost, inbound, user);
++const transport = resolver.resolveSingBoxTransport(inbound, inputHost, protocol, user.vlessUuid);
++const security = resolver.resolveSingBoxSecurity(inbound, inputHost, 'example.com');
++
++assert.deepEqual(protocol, {
++    protocol: 'hysteria',
++    protocolOptions: { version: 2 },
++});
++assert.deepEqual(transport, {
++    transport: 'hysteria',
++    transportOptions: {
++        version: 2,
++        auth: user.vlessUuid,
++    },
++});
++assert.equal(security.security, 'tls');
++
++async function validateSubscriptionOutput() {
++    const service = new SingBoxGeneratorService({
++        getCachedTemplateByType: async () => ({
++            log: { level: 'warn' },
++            inbounds: [],
++            outbounds: [{ type: 'selector', tag: 'PROXY', outbounds: [] }],
++            route: { final: 'PROXY' },
++        }),
++    });
++    const generated = JSON.parse(
++        await service.generateConfig([
++            {
++                finalRemark: 'hy2-test',
++                address: 'example.com',
++                port: 34443,
++                ...protocol,
++                ...transport,
++                ...security,
++                streamOverrides: { finalMask: null, sockopt: null },
++                mux: null,
++                clientOverrides: {
++                    shuffleHost: false,
++                    mihomoX25519: false,
++                    mihomoIpVersion: null,
++                    serverDescription: null,
++                    xrayJsonTemplate: null,
++                    mapper: {},
++                },
++                metadata: { excludeFromSubscriptionTypes: [] },
++            },
++        ]),
++    );
++    const outbound = generated.outbounds.find((item) => item.type === 'hysteria2');
++    assert.ok(outbound, 'Hysteria2 subscription outbound is missing.');
++    assert.equal(outbound.password, user.vlessUuid);
++    assert.equal(outbound.server_port, 34443);
++}
++
++validateSubscriptionOutput()
++    .then(() => {
++        process.stdout.write('singbox_hysteria2_validation=passed\n');
++    })
++    .catch((error) => {
++        console.error(`singbox_hysteria2_validation=failed reason=${error.message}`);
++        process.exitCode = 1;
++    });
+diff --git a/src/common/axios/node-contract-extensions.ts b/src/common/axios/node-contract-extensions.ts
+index 4b7a156..f1693df 100644
+--- a/src/common/axios/node-contract-extensions.ts
++++ b/src/common/axios/node-contract-extensions.ts
+@@ -9,6 +9,12 @@ export type TAddUserToNodeRequest = Omit<AddUserCommand.Request, 'data'> & {
+               username: string;
+               password: string;
+           }
++        | {
++              type: 'hysteria2';
++              tag: string;
++              username: string;
++              password: string;
++          }
+     >;
+ };
+
+@@ -17,11 +23,18 @@ type TAnyTlsBulkInbound = {
+     tag: string;
+ };
+
++type THysteria2BulkInbound = {
++    type: 'hysteria2';
++    tag: string;
++};
++
+ export type TAddUsersToNodeRequest = Omit<AddUsersCommand.Request, 'users'> & {
+     users: Array<
+         Omit<AddUsersCommand.Request['users'][number], 'inboundData'> & {
+             inboundData: Array<
+-                AddUsersCommand.Request['users'][number]['inboundData'][number] | TAnyTlsBulkInbound
++                | AddUsersCommand.Request['users'][number]['inboundData'][number]
++                | TAnyTlsBulkInbound
++                | THysteria2BulkInbound
+             >;
+         }
+     >;
+diff --git a/src/common/helpers/core-config/singbox-config.validator.ts b/src/common/helpers/core-config/singbox-config.validator.ts
+index 1dba2e0..fa620e1 100644
+--- a/src/common/helpers/core-config/singbox-config.validator.ts
++++ b/src/common/helpers/core-config/singbox-config.validator.ts
+@@ -8,7 +8,7 @@ import { UserForConfigEntity } from '@modules/users/entities/users-for-config';
+ import { getSsPassword, isSS2022MethodFromMethod } from '../xray-config/ss-cipher';
+ import { ICoreConfig, ICoreConfigInbound } from './core-config.interface';
+
+-const MANAGED_CLIENT_PROTOCOLS = new Set(['anytls', 'shadowsocks', 'trojan', 'vless']);
++const MANAGED_CLIENT_PROTOCOLS = new Set(['anytls', 'hysteria2', 'shadowsocks', 'trojan', 'vless']);
+
+ type TJsonRecord = Record<string, unknown>;
+
+@@ -155,6 +155,7 @@ export class SingBoxConfig implements ICoreConfig {
+
+         switch (inbound.type) {
+             case 'anytls':
++            case 'hysteria2':
+                 return {
+                     name,
+                     password: user.vlessUuid,
+@@ -231,8 +232,11 @@ export class SingBoxConfig implements ICoreConfig {
+             ) {
+                 throw new Error(`Invalid listen_port in inbound "${inbound.tag}".`);
+             }
+-            if (inbound.type === 'anytls' && !inbound.tls?.enabled) {
+-                throw new Error(`AnyTLS inbound "${inbound.tag}" requires tls.enabled.`);
++            if (
++                (inbound.type === 'anytls' || inbound.type === 'hysteria2') &&
++                !inbound.tls?.enabled
++            ) {
++                throw new Error(`${inbound.type} inbound "${inbound.tag}" requires tls.enabled.`);
+             }
+             seenTags.add(inbound.tag);
+         }
+@@ -250,6 +254,7 @@ export class SingBoxConfig implements ICoreConfig {
+         if (typeof inbound.network === 'string') return inbound.network;
+         if (Array.isArray(inbound.network)) return inbound.network.join(',');
+         if (inbound.type === 'anytls') return 'tcp';
++        if (inbound.type === 'hysteria2') return 'udp';
+         return null;
+     }
+
+diff --git a/src/modules/nodes/events/add-user-to-node/add-user-to-node.handler.ts b/src/modules/nodes/events/add-user-to-node/add-user-to-node.handler.ts
+index 9280c96..5f8c0c4 100644
+--- a/src/modules/nodes/events/add-user-to-node/add-user-to-node.handler.ts
++++ b/src/modules/nodes/events/add-user-to-node/add-user-to-node.handler.ts
+@@ -98,6 +98,7 @@ export class AddUserToNodeHandler implements IEventHandler<AddUserToNodeEvent> {
+                                 tag: inbound.tag,
+                             };
+                         case 'anytls':
++                        case 'hysteria2':
+                             return {
+                                 type: inboundType,
+                                 username: id.toString(),
+diff --git a/src/modules/nodes/events/add-users-to-node/add-users-to-node.handler.ts b/src/modules/nodes/events/add-users-to-node/add-users-to-node.handler.ts
+index f86ede9..04b134a 100644
+--- a/src/modules/nodes/events/add-users-to-node/add-users-to-node.handler.ts
++++ b/src/modules/nodes/events/add-users-to-node/add-users-to-node.handler.ts
+@@ -94,6 +94,7 @@ export class AddUsersToNodeHandler implements IEventHandler<AddUsersToNodeEvent>
+                                 case 'shadowsocks22':
+                                     return { type: inboundType, tag: inbound.tag };
+                                 case 'anytls':
++                                case 'hysteria2':
+                                     return { type: inboundType, tag: inbound.tag };
+                                 default:
+                                     throw new Error(`Unsupported inbound type: ${inboundType}`);
+diff --git a/src/modules/subscription-template/resolve-proxy/resolve-proxy-config.service.ts b/src/modules/subscription-template/resolve-proxy/resolve-proxy-config.service.ts
+index b306bcb..a1ceafe 100644
+--- a/src/modules/subscription-template/resolve-proxy/resolve-proxy-config.service.ts
++++ b/src/modules/subscription-template/resolve-proxy/resolve-proxy-config.service.ts
+@@ -518,6 +518,13 @@ export class ResolveProxyConfigService {
+                             password: user.vlessUuid,
+                         },
+                     };
++                case 'hysteria2':
++                    return {
++                        protocol: 'hysteria',
++                        protocolOptions: {
++                            version: 2,
++                        },
++                    };
+                 case 'vless':
+                     return {
+                         protocol: 'vless',
+@@ -629,7 +636,7 @@ export class ResolveProxyConfigService {
+
+         const isSingBoxInbound = this.isSingBoxInbound(inbound);
+         const transport = isSingBoxInbound
+-            ? this.resolveSingBoxTransport(inbound, inputHost)
++            ? this.resolveSingBoxTransport(inbound, inputHost, protocol, user.vlessUuid)
+             : this.resolveTransport(inbound.streamSettings, inputHost, protocol, {
+                   vlessUuid: user.vlessUuid,
+               });
+@@ -698,7 +705,13 @@ export class ResolveProxyConfigService {
+     private resolveSingBoxTransport(
+         inbound: ISingBoxInbound,
+         inputHost: HostWithRawInbound,
++        protocol: ProtocolVariant,
++        vlessUuid: string,
+     ): TransportVariant {
++        if (inbound.type === 'hysteria2') {
++            return this.resolveHysteria(undefined, vlessUuid, protocol, inputHost.vlessRouteId);
++        }
++
+         const transport = inbound.transport;
+
+         switch (transport?.type) {
+@@ -753,6 +766,7 @@ export class ResolveProxyConfigService {
+     ): SecurityVariant {
+         const tlsEnabled =
+             inbound.type === 'anytls' ||
++            inbound.type === 'hysteria2' ||
+             (inputHost.securityLayer === SECURITY_LAYERS.DEFAULT
+                 ? inbound.tls?.enabled === true
+                 : inputHost.securityLayer === SECURITY_LAYERS.TLS);
+diff --git a/src/queue/_nodes/processors/start-all-nodes-by-profile.processor.ts b/src/queue/_nodes/processors/start-all-nodes-by-profile.processor.ts
+index 6023c88..647c376 100644
+--- a/src/queue/_nodes/processors/start-all-nodes-by-profile.processor.ts
++++ b/src/queue/_nodes/processors/start-all-nodes-by-profile.processor.ts
+@@ -421,7 +421,7 @@ export class StartAllNodesByProfileQueueProcessor extends WorkerHost {
+             coreType === CONFIG_PROFILE_CORE_TYPE.SINGBOX ? inbound.type : inbound.protocol;
+
+         return coreType === CONFIG_PROFILE_CORE_TYPE.SINGBOX
+-            ? ['anytls', 'shadowsocks', 'trojan', 'vless'].includes(String(protocol))
++            ? ['anytls', 'hysteria2', 'shadowsocks', 'trojan', 'vless'].includes(String(protocol))
+             : ['hysteria', 'shadowsocks', 'trojan', 'vless'].includes(String(protocol));
+     }
+ }

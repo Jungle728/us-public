@@ -37,6 +37,33 @@ aaitr-s-ui/edge/certbot-www/
 aaitr-s-ui/edge/certbot-lib/
 aaitr-s-ui/edge/certbot-logs/
 
+# Remnawave 运行时数据与凭据
+remnawave/.env
+remnawave/.admin-password
+remnawave/.*
+remnawave/*.yaml
+!remnawave/mihomo-template.yaml
+remnawave/backups/
+remnawave-node/.env
+remnawave-subscription/.env
+cstonecloud-line/remnawave-node/.env
+remnawave-edge/letsencrypt/
+remnawave-edge/certbot-www/
+remnawave-edge/certbot-lib/
+remnawave-edge/certbot-logs/
+
+# standalone sing-box 仅作为回滚参考，运行配置和锁文件不得提交
+singbox-hy2/config.json
+singbox-hy2/.sync.lock
+cstonecloud-line/remnawave-node/cert/
+remnawave-edge/letsencrypt/
+remnawave-edge/certbot-www/
+remnawave-edge/certbot-lib/
+remnawave-edge/certbot-logs/
+remnawave-edge/backups/
+singbox-hy2/config.json
+singbox-hy2/.sync.lock
+
 # 服务器本地迁移归档，禁止进入公开仓库
 migration/
 
@@ -48,6 +75,8 @@ s-ui-edge/certbot-lib/
 s-ui-edge/certbot-logs/
 s-ui-edge/backups/
 s-ui-edge/*.before-*
+s-ui-edge/*.pre-*
+aaitr-s-ui/edge/*.pre-*
 yuntu-line/yuntu-exit/
 yuntu-line/backups/
 
@@ -76,6 +105,7 @@ workspace-activation/
 notes.md
 deliverable.md
 task_plan.md
+handoff.md
 **/notes.md
 **/deliverable.md
 **/task_plan.md

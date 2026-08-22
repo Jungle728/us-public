@@ -1,0 +1,269 @@
+diff --git a/libs/contract/commands/handler/add-user.command.ts b/libs/contract/commands/handler/add-user.command.ts
+index 4b4d6b1..612fcbb 100644
+--- a/libs/contract/commands/handler/add-user.command.ts
++++ b/libs/contract/commands/handler/add-user.command.ts
+@@ -60,6 +60,13 @@ export namespace AddUserCommand {
+         password: z.string(),
+     });
+
++    const BaseHysteria2User = z.object({
++        type: z.literal('hysteria2'),
++        tag: z.string(),
++        username: z.string(),
++        password: z.string(),
++    });
++
+     export const RequestSchema = z.object({
+         data: z.array(
+             z.discriminatedUnion('type', [
+@@ -69,6 +76,7 @@ export namespace AddUserCommand {
+                 BaseShadowsocks22User,
+                 BaseHysteriaUser,
+                 BaseAnyTlsUser,
++                BaseHysteria2User,
+             ]),
+         ),
+         hashData: z.object({
+diff --git a/libs/contract/commands/handler/add-users.command.ts b/libs/contract/commands/handler/add-users.command.ts
+index de4e569..530f448 100644
+--- a/libs/contract/commands/handler/add-users.command.ts
++++ b/libs/contract/commands/handler/add-users.command.ts
+@@ -36,6 +36,11 @@ export namespace AddUsersCommand {
+         tag: z.string(),
+     });
+
++    const BaseHysteria2User = z.object({
++        type: z.literal('hysteria2'),
++        tag: z.string(),
++    });
++
+     export const RequestSchema = z.object({
+         affectedInboundTags: z.array(z.string()),
+         users: z.array(
+@@ -48,6 +53,7 @@ export namespace AddUsersCommand {
+                         BaseShadowsocks22User,
+                         BaseHysteriaUser,
+                         BaseAnyTlsUser,
++                        BaseHysteria2User,
+                     ]),
+                 ),
+
+diff --git a/scripts/validate-dual-core-contract.mjs b/scripts/validate-dual-core-contract.mjs
+index 6039d9c..31cf557 100644
+--- a/scripts/validate-dual-core-contract.mjs
++++ b/scripts/validate-dual-core-contract.mjs
+@@ -25,11 +25,16 @@ assert(packageJson.scripts.build === 'rspack build', 'official_rspack_build_miss
+ assert(packageJson.scripts.typecheck === 'tsc --noEmit', 'typecheck_script_missing');
+
+ const startContract = await read('libs/contract/commands/xray/start.command.ts');
++const addUserContract = await read('libs/contract/commands/handler/add-user.command.ts');
++const addUsersContract = await read('libs/contract/commands/handler/add-users.command.ts');
+ assert(startContract.includes('CORE_TYPE.SINGBOX'), 'singbox_core_type_contract_missing');
+ assert(startContract.includes('.default(CORE_TYPE.XRAY)'), 'xray_default_core_contract_missing');
++assert(addUserContract.includes("z.literal('hysteria2')"), 'hysteria2_add_user_contract_missing');
++assert(addUsersContract.includes("z.literal('hysteria2')"), 'hysteria2_add_users_contract_missing');
+
+ const xrayService = await read('src/modules/xray-core/xray.service.ts');
+ const singBoxService = await read('src/modules/core/singbox.service.ts');
++const singBoxStatsService = await read('src/modules/core/singbox-stats.service.ts');
+ assert(xrayService.includes('body.coreType === CORE_TYPE.SINGBOX'), 'core_dispatch_missing');
+ assert(
+     xrayService.includes('this.singBoxService.start(body, ip)'),
+@@ -38,6 +43,12 @@ assert(
+ assert(singBoxService.includes('writeAndValidateConfig'), 'singbox_config_validation_missing');
+ assert(singBoxService.includes('mutateUsers'), 'singbox_user_mutation_missing');
+ assert(singBoxService.includes('accumulateAndReset'), 'singbox_stats_accumulation_missing');
++assert(singBoxService.includes("case 'hysteria2':"), 'hysteria2_user_mutation_missing');
++assert(
++    singBoxStatsService.includes('SINGBOX_STATS_STATE_PATH'),
++    'singbox_stats_persistence_path_missing',
++);
++assert(singBoxStatsService.includes('persistAccumulated'), 'singbox_stats_persistence_missing');
+ assert(singBoxService.includes('processService.restart()'), 'singbox_restart_missing');
+ assert(singBoxService.includes('waitUntilReady'), 'singbox_health_wait_missing');
+
+diff --git a/src/modules/core/singbox-stats.service.ts b/src/modules/core/singbox-stats.service.ts
+index 8f675c0..c5a2e39 100644
+--- a/src/modules/core/singbox-stats.service.ts
++++ b/src/modules/core/singbox-stats.service.ts
+@@ -1,6 +1,8 @@
+ import { ChannelCredentials, createChannel, createClient } from 'nice-grpc';
++import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
++import { dirname } from 'node:path';
+
+-import { Injectable } from '@nestjs/common';
++import { Injectable, Logger } from '@nestjs/common';
+
+ import {
+     QueryStatsResponse,
+@@ -31,8 +33,12 @@ const SINGBOX_STATS_SERVICE_DEFINITION = {
+
+ @Injectable()
+ export class SingBoxStatsService {
++    private readonly logger = new Logger(SingBoxStatsService.name);
+     private readonly client: ISingBoxStatsClient;
+     private readonly accumulated = new Map<string, number>();
++    private readonly statePath: string;
++    private readonly ready: Promise<void>;
++    private serial: Promise<void> = Promise.resolve();
+
+     constructor() {
+         const listen = process.env.SINGBOX_API_LISTEN ?? '127.0.0.1:19090';
+@@ -43,6 +49,9 @@ export class SingBoxStatsService {
+             SINGBOX_STATS_SERVICE_DEFINITION,
+             channel,
+         ) as unknown as ISingBoxStatsClient;
++        this.statePath =
++            process.env.SINGBOX_STATS_STATE_PATH ?? '/var/lib/remnawave/singbox-stats.json';
++        this.ready = this.loadAccumulated();
+     }
+
+     public async getSysStats(): Promise<SysStatsResponse> {
+@@ -50,39 +59,91 @@ export class SingBoxStatsService {
+     }
+
+     public async accumulateAndReset(): Promise<void> {
+-        const current = await this.queryRaw(true);
+-        for (const [name, value] of current) {
+-            this.accumulated.set(name, (this.accumulated.get(name) ?? 0) + value);
+-        }
++        await this.exclusive(async () => {
++            const current = await this.queryRaw(true);
++            for (const [name, value] of current) {
++                this.accumulated.set(name, (this.accumulated.get(name) ?? 0) + value);
++            }
++            await this.persistAccumulated();
++        });
+     }
+
+     public async getSnapshot(
+         reset: boolean,
+         resetPrefixes?: string[],
+     ): Promise<ISingBoxStatsSnapshot> {
+-        const current = await this.queryRaw(reset);
+-        const combined = new Map(this.accumulated);
++        return await this.exclusive(async () => {
++            const current = await this.queryRaw(reset);
++            const combined = new Map(this.accumulated);
+
+-        for (const [name, value] of current) {
+-            combined.set(name, (combined.get(name) ?? 0) + value);
+-        }
++            for (const [name, value] of current) {
++                combined.set(name, (combined.get(name) ?? 0) + value);
++            }
+
+-        if (reset) {
+-            this.accumulated.clear();
+-            if (resetPrefixes && resetPrefixes.length > 0) {
+-                for (const [name, value] of combined) {
+-                    if (!resetPrefixes.some((prefix) => name.startsWith(prefix))) {
+-                        this.accumulated.set(name, value);
++            if (reset) {
++                this.accumulated.clear();
++                if (resetPrefixes && resetPrefixes.length > 0) {
++                    for (const [name, value] of combined) {
++                        if (!resetPrefixes.some((prefix) => name.startsWith(prefix))) {
++                            this.accumulated.set(name, value);
++                        }
+                     }
+                 }
++                await this.persistAccumulated();
+             }
++
++            return this.parseSnapshot(combined);
++        });
++    }
++
++    public async clear(): Promise<void> {
++        await this.exclusive(async () => {
++            this.accumulated.clear();
++            await this.persistAccumulated();
++        });
++    }
++
++    private async exclusive<T>(operation: () => Promise<T>): Promise<T> {
++        const previous = this.serial;
++        let release: () => void = () => undefined;
++        this.serial = new Promise<void>((resolve) => {
++            release = resolve;
++        });
++        await previous;
++        await this.ready;
++        try {
++            return await operation();
++        } finally {
++            release();
+         }
++    }
+
+-        return this.parseSnapshot(combined);
++    private async loadAccumulated(): Promise<void> {
++        try {
++            const payload = JSON.parse(await readFile(this.statePath, 'utf8')) as Record<
++                string,
++                unknown
++            >;
++            for (const [name, value] of Object.entries(payload)) {
++                if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
++                    this.accumulated.set(name, value);
++                }
++            }
++        } catch (error) {
++            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
++                this.logger.warn(`Failed to restore sing-box stats accumulator: ${error}`);
++            }
++        }
+     }
+
+-    public clear(): void {
+-        this.accumulated.clear();
++    private async persistAccumulated(): Promise<void> {
++        const temporaryPath = `${this.statePath}.${process.pid}.tmp`;
++        await mkdir(dirname(this.statePath), { recursive: true });
++        await writeFile(temporaryPath, JSON.stringify(Object.fromEntries(this.accumulated)), {
++            encoding: 'utf8',
++            mode: 0o600,
++        });
++        await rename(temporaryPath, this.statePath);
+     }
+
+     private async queryRaw(reset: boolean): Promise<Map<string, number>> {
+diff --git a/src/modules/core/singbox.service.ts b/src/modules/core/singbox.service.ts
+index c9e1b93..252e735 100644
+--- a/src/modules/core/singbox.service.ts
++++ b/src/modules/core/singbox.service.ts
+@@ -240,6 +240,7 @@ export class SingBoxService {
+                 inbound.users ??= [];
+                 switch (user.type) {
+                     case 'anytls':
++                    case 'hysteria2':
+                     case 'trojan':
+                     case 'shadowsocks':
+                     case 'shadowsocks22':
+diff --git a/docker/Dockerfile b/docker/Dockerfile
+index c9f530a..3378eb2 100644
+--- a/docker/Dockerfile
++++ b/docker/Dockerfile
+@@ -55,7 +55,7 @@ FROM alpine:3.21 AS geocheck
+
+ ARG GEOCHECK_VERSION=0.3.0
+ ARG GEOCHECK_RELEASE_URL=https://github.com/remnawave/geocheck/releases/download
+-ARG TARGETARCH
++ARG TARGETARCH=amd64
+
+ RUN apk add --no-cache curl \
+     && cd /tmp \
+@@ -124,9 +124,9 @@ RUN apt-get update \
+
+ ARG INTEGRATIONS=""
+
+-RUN --mount=type=bind,source=docker/integrations,target=/mnt/integrations \
+-    --mount=type=bind,from=integration-bin,target=/mnt/bin \
+-    sh /mnt/integrations/install.sh "${INTEGRATIONS}"
++COPY docker/integrations /tmp/integrations
++RUN sh /tmp/integrations/install.sh "${INTEGRATIONS}" \
++    && rm -rf /tmp/integrations
+
+ ENV NODE_ENV=production
+ ENV NODE_OPTIONS="--max-http-header-size=65536"

@@ -1,0 +1,15 @@
+[Unit]
+Description=Sync Remnawave users to standalone sing-box Hysteria2
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/code/us-public/singbox-hy2
+ExecStart=/usr/bin/python3 /root/code/us-public/singbox-hy2/export_remnawave_hy2.py --restart
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/root/code/us-public/singbox-hy2

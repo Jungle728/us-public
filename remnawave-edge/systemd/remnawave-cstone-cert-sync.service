@@ -1,0 +1,13 @@
+[Unit]
+Description=Sync Remnawave certificate to CStoneCloud node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/code/us-public/remnawave-edge
+ExecStart=/usr/bin/python3 /root/code/us-public/remnawave-edge/sync_cstonecloud_cert.py
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

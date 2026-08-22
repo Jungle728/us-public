@@ -1,0 +1,53 @@
+services:
+  remnanode:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local/remnawave-node:3.3.2-xray-26.6.27
+    container_name: remnanode
+    hostname: remnanode
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - /root/code/us-public/remnawave-edge/letsencrypt:/etc/letsencrypt:ro
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  hy2-compat-relay:
+    image: gogost/gost:3.2.6@sha256:d0256552878ff6c0ffddae16236aa0a61c27b8311263c1a48cbe3128cf1e0af7
+    container_name: remnawave-hy2-compat-relay
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - -L
+      - udp://:32443/127.0.0.1:34443?keepalive=true&ttl=60s&readBufferSize=65535
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"

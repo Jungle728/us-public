@@ -1,0 +1,199 @@
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: warning
+ipv6: false
+unified-delay: true
+tcp-concurrent: true
+geodata-mode: true
+
+geox-url:
+  geoip: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat
+  geosite: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat
+  mmdb: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb
+  asn: https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb
+
+profile:
+  store-selected: true
+  store-fake-ip: false
+
+tun:
+  enable: true
+  stack: mixed
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: true
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+
+sniffer:
+  enable: true
+  parse-pure-ip: true
+  override-destination: true
+  sniff:
+    HTTP:
+      ports:
+        - 80
+        - 8080-8880
+    TLS:
+      ports:
+        - 443
+        - 8443
+    QUIC:
+      ports:
+        - 443
+        - 8443
+  skip-domain:
+    - Mijia Cloud
+    - '+.push.apple.com'
+
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  cache-algorithm: arc
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: blacklist
+  ipv6: false
+  prefer-h3: false
+  respect-rules: false
+  use-hosts: false
+  use-system-hosts: false
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  nameserver:
+    - 'https://1.1.1.1/dns-query#EXIT-MODE'
+    - 'https://8.8.8.8/dns-query#EXIT-MODE'
+  nameserver-policy:
+    '+.bigpandas.top':
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
+    shu26.cfd:
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
+    ucloud-frp.sometimesnaive.top:
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
+    geosite:category-ai-!cn:
+      - 'https://1.1.1.1/dns-query#EXIT-MODE'
+      - 'https://8.8.8.8/dns-query#EXIT-MODE'
+    geosite:private:
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
+    geosite:cn:
+      - 'https://223.5.5.5/dns-query#DIRECT'
+      - 'https://1.12.12.12/dns-query#DIRECT'
+  proxy-server-nameserver:
+    - https://223.5.5.5/dns-query
+    - https://1.12.12.12/dns-query
+  direct-nameserver:
+    - https://223.5.5.5/dns-query
+    - https://1.12.12.12/dns-query
+  direct-nameserver-follow-policy: false
+  fallback: []
+  fake-ip-filter:
+    - 'geosite:private'
+    - 'geosite:cn'
+    - '*.lan'
+    - '*.local'
+    - '*.localhost'
+    - '*.localdomain'
+    - '*.arpa'
+    - localhost
+    - 'time.*.com'
+    - 'ntp.*.com'
+    - '+.pool.ntp.org'
+    - '+.market.xiaomi.com'
+    - '+.push.apple.com'
+    - localhost.ptlogin2.qq.com
+    - '*.msftncsi.com'
+    - www.msftconnecttest.com
+
+proxy-groups:
+  - name: EXIT-MODE
+    type: select
+    proxies:
+      - CSC-AAITR
+      - CSC
+      - AAITR
+    remnawave:
+      include-proxies: false
+  - name: CSC-AAITR
+    type: select
+    proxies:
+      - CSC-AAITR-AUTO
+      - csc-aaitr-reality
+      - csc-aaitr-hy2
+      - csc-aaitr-hy2-singbox-test
+      - csc-aaitr-tls
+    remnawave:
+      include-proxies: false
+  - name: CSC
+    type: select
+    proxies:
+      - CSC-AUTO
+      - csc-reality
+      - csc-hy2
+      - csc-tls
+    remnawave:
+      include-proxies: false
+  - name: AAITR
+    type: select
+    proxies:
+      - AAITR-AUTO
+      - aaitr-reality
+      - aaitr-hy2
+      - aaitr-tls
+    remnawave:
+      include-proxies: false
+  - name: CSC-AAITR-AUTO
+    type: url-test
+    include-all-proxies: true
+    filter: ^csc-aaitr-(reality|hy2|tls)$
+    url: https://cp.cloudflare.com/generate_204
+    interval: 300
+    timeout: 5000
+    tolerance: 50
+    lazy: true
+    expected-status: 204
+    remnawave:
+      include-proxies: false
+  - name: CSC-AUTO
+    type: url-test
+    include-all-proxies: true
+    filter: ^csc-(reality|hy2|tls)$
+    url: https://cp.cloudflare.com/generate_204
+    interval: 300
+    timeout: 5000
+    tolerance: 50
+    lazy: true
+    expected-status: 204
+    remnawave:
+      include-proxies: false
+  - name: AAITR-AUTO
+    type: url-test
+    include-all-proxies: true
+    filter: ^aaitr-(reality|hy2|tls)$
+    url: https://cp.cloudflare.com/generate_204
+    interval: 300
+    timeout: 5000
+    tolerance: 50
+    lazy: true
+    expected-status: 204
+    remnawave:
+      include-proxies: false
+
+rules:
+  - DOMAIN-SUFFIX,bigpandas.top,DIRECT
+  - DOMAIN-SUFFIX,shu26.cfd,DIRECT
+  - DOMAIN,ucloud-frp.sometimesnaive.top,DIRECT
+  - GEOSITE,category-ai-!cn,EXIT-MODE
+  - DOMAIN-SUFFIX,browserleaks.com,EXIT-MODE
+  - GEOSITE,private,DIRECT
+  - GEOIP,private,DIRECT,no-resolve
+  - GEOSITE,cn,DIRECT
+  - GEOIP,cn,DIRECT,no-resolve
+  - MATCH,EXIT-MODE
+  - MATCH,REJECT

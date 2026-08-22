@@ -1,0 +1,106 @@
+name: remnawave-hy2-lab
+
+services:
+  hy2-db:
+    image: postgres:18.4
+    container_name: remnawave-hy2-lab-db
+    restart: unless-stopped
+    env_file:
+      - panel.env
+    environment:
+      TZ: UTC
+    shm_size: 256mb
+    volumes:
+      - hy2-lab-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  hy2-valkey:
+    image: valkey/valkey:9-alpine
+    container_name: remnawave-hy2-lab-valkey
+    restart: unless-stopped
+    command:
+      - valkey-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory-policy
+      - noeviction
+      - --loglevel
+      - warning
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  hy2-panel:
+    image: local/remnawave-backend:3.3.2-singbox-hy2
+    container_name: remnawave-hy2-lab-panel
+    restart: unless-stopped
+    env_file:
+      - panel.env
+    ports:
+      - 127.0.0.1:3300:3000
+      - 127.0.0.1:3301:3001
+    depends_on:
+      hy2-db:
+        condition: service_healthy
+      hy2-valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3001/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  hy2-node:
+    image: local/remnawave-node:3.3.2-singbox-hy2
+    container_name: remnawave-hy2-lab-node
+    restart: unless-stopped
+    profiles: ["node"]
+    env_file:
+      - node.env
+    ports:
+      - 35443:35443/udp
+    volumes:
+      - /root/code/us-public/remnawave-edge/letsencrypt:/etc/letsencrypt:ro
+      - ./runtime/node-state:/var/lib/remnawave
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+
+  hy2-client-a:
+    image: ghcr.io/sagernet/sing-box:v1.13.15@sha256:4aa30343cea6b5407960f99b36ffa653403d9ddcb1fc2800c9fb85a1bd77d6d8
+    container_name: remnawave-hy2-lab-client-a
+    restart: unless-stopped
+    profiles: ["client"]
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+    ports:
+      - 127.0.0.1:20880:20880
+    volumes:
+      - ./runtime/client-a.json:/etc/sing-box/config.json:ro
+
+  hy2-client-b:
+    image: ghcr.io/sagernet/sing-box:v1.13.15@sha256:4aa30343cea6b5407960f99b36ffa653403d9ddcb1fc2800c9fb85a1bd77d6d8
+    container_name: remnawave-hy2-lab-client-b
+    restart: unless-stopped
+    profiles: ["client"]
+    command: ["run", "-c", "/etc/sing-box/config.json"]
+    ports:
+      - 127.0.0.1:20881:20881
+    volumes:
+      - ./runtime/client-b.json:/etc/sing-box/config.json:ro
+
+volumes:
+  hy2-lab-db:
