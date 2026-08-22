@@ -18,10 +18,11 @@ ACME 续期、TLS Vision 普通 HTTPS 回落和公共 Shadowrocket 规则。
 旧 `/api/sub/<short-uuid>` 仍代理到 Remnawave 后端，避免已添加的客户端失效。
 用户订阅链接若被手机客户端自动追加 `/clash`，入口会将其改写到 `/mihomo`，
 因为当前 Remnawave 的显式 CLASH 渲染器无法展开受管节点，而 Mihomo 渲染器可以。
-同时提供 s-ui 风格兼容地址 `https://sub-verizon.bigpandas.top/clash/<short-uuid>`，
-该地址也会返回 Mihomo YAML。为兼容要求文件扩展名的移动客户端，还提供
-`https://sub-verizon.bigpandas.top/clash/<short-uuid>.yaml` 和 `.yml` 两种形式；
-它们仍按短 UUID 动态生成对应用户配置，不是共享静态凭据文件。
+同时提供 s-ui 风格兼容地址 `https://sub-verizon.bigpandas.top/clash/<short-uuid>`。
+为兼容要求文件扩展名的移动客户端，`.yaml` 和 `.yml` 形式会直接代理后端
+`/api/sub/<short-uuid>/mihomo`，URL 响应体本身就是 YAML，不经过订阅网页。
+根路径 `https://sub-verizon.bigpandas.top/<short-uuid>.yaml` 和 `.yml` 也提供相同
+的直接 YAML 响应。
 
 ## 运行数据
 
