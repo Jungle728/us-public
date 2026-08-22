@@ -126,7 +126,6 @@ proxy-groups:
       - CSC-AAITR-AUTO
       - csc-aaitr-reality
       - csc-aaitr-hy2
-      - csc-aaitr-hy2-singbox-test
       - csc-aaitr-tls
     remnawave:
       include-proxies: false

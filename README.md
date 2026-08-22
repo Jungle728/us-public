@@ -98,6 +98,11 @@ rules:
 
 如果以后发现某个域名误分类，优先在 `GEOSITE,cn,DIRECT` 前添加个人补丁规则。
 
+手机端 Clash Mi、ClashMetaForAndroid 等客户端通过订阅请求的 User-Agent 统一获取
+Mihomo YAML；电脑端 Clash Verge Rev 也使用同一份模板。响应规则和模板分别由
+`remnawave/apply_subscription_response_rules.py` 与
+`remnawave/apply_subscription_template.py` 管理。
+
 ## 管理与转发服务
 
 Remnawave 是唯一的用户、订阅、节点和出口管理源。生产共有四个 Node 实例：
