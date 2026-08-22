@@ -20,6 +20,8 @@ Profile 不变的同时允许独立 sing-box Node 管理 HY2；数据库仅绑�
 正式用户入口由官方 Subscription Page 的 `/<short-uuid>` 提供；旧
 `/api/sub/<short-uuid>` 继续兼容。版本控制中的 `mihomo-template.yaml` 是生产
 默认 Mihomo 模板，使用 `apply_subscription_template.py` 应用或检查。
+显式 `/clash` 后缀由 `sync_clash_template.py` 同步到同一份 Mihomo YAML，避免手机
+客户端绕过 User-Agent 响应规则后拿到旧的空配置。
 响应规则中的通用 Clash 客户端（包括 Clash Mi、ClashMetaForAndroid 等）统一返回
 该 Mihomo 模板；使用 `apply_subscription_response_rules.py` 应用或检查，避免手机端
 命中旧的空代理 Clash 模板。
