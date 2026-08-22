@@ -17,7 +17,8 @@ ACME 续期、TLS Vision 普通 HTTPS 回落和公共 Shadowrocket 规则。
 唯一的用户订阅入口是
 `https://sub-verizon.bigpandas.top/<short-uuid>`。该地址直接代理
 `/api/sub/<short-uuid>/mihomo`，响应体就是原始 YAML，不经过 Subscription Page，
-也不需要追加 `/clash` 或 `.yaml` 后缀。
+也不需要追加 `/clash` 或 `.yaml` 后缀；下载响应会使用
+`<username>.yaml` 文件名。
 
 短 UUID 仍是用户订阅凭据；面板中修改节点、协议权限或模板后，客户端刷新这一
 地址即可获得最新配置。
