@@ -149,7 +149,7 @@ proxy-groups:
       include-proxies: false
   - name: CSC-AAITR-AUTO
     type: url-test
-    include-all-proxies: true
+    include-all: true
     filter: ^csc-aaitr-(reality|hy2|tls)$
     url: https://cp.cloudflare.com/generate_204
     interval: 300
@@ -161,7 +161,7 @@ proxy-groups:
       include-proxies: false
   - name: CSC-AUTO
     type: url-test
-    include-all-proxies: true
+    include-all: true
     filter: ^csc-(reality|hy2|tls)$
     url: https://cp.cloudflare.com/generate_204
     interval: 300
@@ -173,7 +173,7 @@ proxy-groups:
       include-proxies: false
   - name: AAITR-AUTO
     type: url-test
-    include-all-proxies: true
+    include-all: true
     filter: ^aaitr-(reality|hy2|tls)$
     url: https://cp.cloudflare.com/generate_204
     interval: 300
