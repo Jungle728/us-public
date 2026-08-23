@@ -1,0 +1,72 @@
+services:
+  decoy:
+    image: nginx:1.30.3-alpine@sha256:0d3b80406a13a767339fbe2f41406d6c7da727ab89cf8fae399e81f780f814d1
+    container_name: cstonecloud-decoy-nginx
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /run:rw,noexec,nosuid,size=8m
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m
+    volumes:
+      - ./decoy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./decoy/index.html:/usr/share/nginx/html/index.html:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    pids_limit: 64
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t && nc -z 127.0.0.1 18080"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: local
+      options:
+        max-size: 5m
+        max-file: "2"
+
+  relay:
+    image: haproxy:2.8-alpine@sha256:68d20e9f9f1d825c4eb8e72a80e36643bb84bf3ffa61bb1059b804f69700a83a
+    container_name: cstonecloud-relay
+    user: "0:0"
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /run:rw,noexec,nosuid,size=16m
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+    pids_limit: 128
+    mem_limit: 96m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg >/dev/null && nc -z 127.0.0.1 443"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+    stop_grace_period: 30s
